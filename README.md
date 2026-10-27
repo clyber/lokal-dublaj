@@ -4,6 +4,8 @@ Yabancı dildeki YouTube videolarını **kendi bilgisayarında** Türkçe seslen
 
 Kimin için: Windows + NVIDIA ekran kartı + Firefox kullanan, yerel model kurmaya ve videonun önceden hazırlanmasını beklemeye razı olanlar.
 
+Tanıtım videosu (1,5 dk, yapay zekâ sesli anlatım): https://youtu.be/bO6gXYwNcIw
+
 Videodaki **TR** düğmesine basarsın; video arka planda yazıya dökülür, yerel bir dil modeliyle çevrilir ve Türkçe seslendirilir. Hazır olunca "TR dinle" dersin: oynat, durdur, sar ve hız YouTube'un düğmeleriyle çalışır, Türkçe ses açıkken özgün ses kapanır, ses düzeyi YouTube'un kaydırıcısını izler.
 
 > **Durum: erken sürüm (0.1).** Tek bir bilgisayarda denendi: Windows 10, NVIDIA RTX 5080, Firefox. Başka donanımda sorun çıkarsa issue açman çok değerli.
