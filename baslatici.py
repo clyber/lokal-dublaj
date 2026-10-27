@@ -13,7 +13,7 @@ AD = "LokalDublaj"
 
 
 def istek(yol, yontem="GET"):
-    r = urllib.request.Request(ADRES + yol, method=yontem, headers={"X-TR-Ses": "1"})
+    r = urllib.request.Request(ADRES + yol, method=yontem, headers={"X-TR-Belirtec": ortak.belirtec()})
     with urllib.request.urlopen(r, timeout=2) as y:
         return json.load(y)
 
@@ -125,13 +125,22 @@ def tepsi():
         yield pystray.Menu.SEPARATOR
         yield pystray.MenuItem("Listeyi yenile", lambda: threading.Thread(target=modelleri_yenile).start())
 
+    def cikis(i):
+        # süren hazırlama ayrı süreç (cevir.py): sunucu kapanınca da biter; kullanıcı "iptal oldu" sanmasın
+        if son["metin"].startswith("Hazırlanıyor"):
+            i.notify("Hazırlanan video arka planda bitmeye devam ediyor; bitince videoda \"TR dinle\" görünür.",
+                     "Lokal Dublaj")
+            time.sleep(3)  # bildirim simge kalkmadan gösterilsin
+        durdur()
+        i.stop()
+
     menu = pystray.Menu(
         pystray.MenuItem(metin, None, enabled=False),
         pystray.MenuItem(lambda _: "Durdur" if son["acik"] else "Başlat",
                          lambda: threading.Thread(target=durdur if son["acik"] else baslat).start(), default=True),
         pystray.MenuItem(lambda _: f"Çeviri modeli: {son['secili'] or 'seçilmedi'}", pystray.Menu(model_ogeleri)),
         pystray.MenuItem("Windows açılınca başlat", lambda: acilista_ayarla(not acilista()), checked=lambda _: acilista()),
-        pystray.MenuItem("Çıkış (sunucuyu da kapatır)", lambda i: (durdur(), i.stop())),
+        pystray.MenuItem("Çıkış (sunucuyu da kapatır)", lambda i: cikis(i)),
     )
     ikon = pystray.Icon(AD, resim(False), "Lokal Dublaj", menu)
 

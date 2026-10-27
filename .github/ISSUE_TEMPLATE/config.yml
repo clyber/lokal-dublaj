@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Güvenlik açığı bildir (özel)
+    url: https://github.com/clyber/lokal-dublaj/security/advisories/new
+    about: Güvenlik açıklarını herkese açık issue yerine buradan bildir.

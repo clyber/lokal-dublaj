@@ -58,7 +58,7 @@
   async function ac() {
     video = document.querySelector("#movie_player video");
     if (!video) return;
-    await browser.runtime.sendMessage({ tip: "ac", vid });
+    if (!(await browser.runtime.sendMessage({ tip: "ac", vid }))) return; // ses bileti alınamadı (sunucu/köprü)
     eskiSes = video.volume;
     for (const [o, f] of Object.entries(olaylar)) video.addEventListener(o, f);
     acik = true;
@@ -197,7 +197,7 @@
   }
 
   // Eklenti güncellenince Firefox yeni betiği açık sekmelere de yükler; eski sürümün düğmeleri sayfada kalıp
-  // yenilerin altında görünür [Fatih 10-27, 0.1.9 güncellemesinde "TR dinle" ile "TR kapat" üst üste].
+  // yenilerin altında görünür (0.1.9 güncellemesinde "TR dinle" ile "TR kapat" üst üste görüldü).
   // 0.1.10 öncesi düğmelerde sınıf yok: oynatıcıdaki "TR…" / "▾" düğmeleri ve bilgi paneli de silinir.
   function eskileriSil() {
     for (const e of document.querySelectorAll("#movie_player > .lokal-dublaj, #movie_player > button, #movie_player > div"))

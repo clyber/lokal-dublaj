@@ -1,5 +1,6 @@
 """Firefox köprüsü (native messaging): eklenti, sunucu kapalıyken videodaki düğmeye basılınca buna {"komut": "baslat"} yollar.
 Köprü tepsi simgesini açar (o da sunucuyu başlatır); simge zaten açık ama sunucu durdurulmuşsa sunucuyu doğrudan başlatır.
+{"komut": "belirtec"}: sunucunun her istekte istediği kurulum belirtecini verir (eklenti onu yalnız buradan alır).
 Firefox bunu kopru.bat üzerinden çalıştırır; kayıt: kopru-kur.ps1. Mesaj biçimi: 4 bayt uzunluk + JSON (stdin/stdout).
 """
 import json, struct, subprocess, sys, time
@@ -47,5 +48,7 @@ def ac():
 
 
 if __name__ == "__main__":
-    m = oku()
-    yaz({"acik": ac()} if m and m.get("komut") == "baslat" else {"hata": "bilinmeyen komut"})
+    m = (oku() or {}).get("komut")
+    # belirteç: sunucunun istediği kurulum anahtarı; yalnız bu kanaldan (Firefox'un bu eklentiye ayırdığı) verilir
+    yaz({"acik": ac(), "belirtec": ortak.belirtec()} if m == "baslat" else
+        {"belirtec": ortak.belirtec()} if m == "belirtec" else {"hata": "bilinmeyen komut"})

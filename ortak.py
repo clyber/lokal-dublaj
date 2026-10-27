@@ -1,6 +1,6 @@
 """Ortak parçalar: ayar dosyası, video kimliği, ekran kartı sırası, çeviri modeli (cevir.py, sunucu.py, toplu.py,
 baslatici.py kullanır)."""
-import json, os, re, sys, time, tomllib, urllib.error, urllib.request
+import hmac, json, os, re, secrets, sys, time, tomllib, urllib.error, urllib.request
 from pathlib import Path
 
 KOK = Path(__file__).parent
@@ -89,6 +89,30 @@ def cuda_dll_yolu():
             os.environ["PATH"] = str(d) + os.pathsep + os.environ["PATH"]
 
 
+def belirtec():
+    """Kurulum başına gizli belirteç (ilk çağrıda üretilir, KOK/.belirtec, git dışı). Sunucu her istekte ister; eklenti
+    onu yalnız köprüden alır (Firefox o kanalı yalnız bu eklentiye açar), tepsi dosyadan okur. Sıradan bir web sayfası
+    ya da başka bir program onu bilmeden iş başlatamaz, durum ya da ses okuyamaz."""
+    f = KOK / ".belirtec"
+    try:  # aynı anda iki süreç üretmeye kalkarsa yalnız biri yazar (O_EXCL), öteki onunkini okur
+        fd = os.open(f, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        with os.fdopen(fd, "w") as h:
+            h.write(secrets.token_urlsafe(32))
+    except FileExistsError:
+        pass
+    for _ in range(50):
+        if b := f.read_text().strip():
+            return b
+        time.sleep(0.02)
+    raise Hata("belirteç dosyası boş: " + str(f))
+
+
+def ses_bileti(vid):
+    """Tek videonun sesini okumaya yarayan bilet: Audio nesnesi başlık gönderemediği için adrese eklenir; asıl
+    belirteç adrese hiç yazılmaz, bilet de yalnız o videoyu açar."""
+    return hmac.new(belirtec().encode(), vid.encode(), "sha256").hexdigest()[:32]
+
+
 class Hata(Exception):
     """Kullanıcıya gösterilecek, açıklaması belli hata (cevir.py bunu hata.txt'ye, tepsi bildirime yazar)."""
 
@@ -141,7 +165,7 @@ def cevap_coz(cevap, istenen):
             if k in istenen and v.strip()}
 
 
-# Model seçilirken gerçek istem biçimiyle 3 cümle: olumsuzluk, sayı+birim, teknik terim (Codex rapor-5 önerisi)
+# Model seçilirken gerçek istem biçimiyle 3 cümle: olumsuzluk, sayı+birim, teknik terim
 DENEME = [{"id": 0, "bas": 0, "son": 2.5, "metin": "Do not exceed 12 volts."},
           {"id": 1, "bas": 2.5, "son": 5.5, "metin": "Tighten the screw to 0.8 newton metres."},
           {"id": 2, "bas": 5.5, "son": 8.5, "metin": "The fan stays on after the motor stops."}]

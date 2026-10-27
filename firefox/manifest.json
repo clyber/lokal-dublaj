@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Lokal Dublaj",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "YouTube videosunu yerel bilgisayarda hazırlanan Türkçe sesle, videonun kendi düğmeleriyle senkron oynatır.",
   "permissions": ["*://*.youtube.com/*", "http://127.0.0.1/*", "nativeMessaging"],
   "incognito": "not_allowed",

@@ -1,0 +1,37 @@
+name: Hata bildir
+description: Bir şey çalışmıyor ya da beklenmedik davranıyor
+labels: [hata]
+body:
+  - type: markdown
+    attributes:
+      value: "Güvenlik açığıysa burayı kullanma: Security → Report a vulnerability. Belirteç (.belirtec), ayar dosyanın tamamı ya da izleme geçmişini yapıştırma."
+  - type: dropdown
+    id: asama
+    attributes:
+      label: Nerede takıldın?
+      options: [Kurulum (kur.ps1), Firefox eklentisi / düğme, Sunucu / simge, İndirme, Yazıya dökme, Çeviri, Seslendirme, Dinleme / senkron, Diğer]
+    validations: { required: true }
+  - type: textarea
+    id: ne-oldu
+    attributes:
+      label: Ne yaptın, ne bekledin, ne oldu?
+      description: Videodaki düğmenin yazısı ya da ▾ panelindeki hata metni çok işe yarar.
+    validations: { required: true }
+  - type: textarea
+    id: ortam
+    attributes:
+      label: Ortam
+      description: "`pwsh -File kur.ps1 -Denetle` çıktısının tablosunu yapıştır (Windows, Python, Node, ffmpeg, ekran kartı ve VRAM, LM Studio modeli)."
+      render: text
+    validations: { required: true }
+  - type: input
+    id: surum
+    attributes:
+      label: Lokal Dublaj sürümü
+      description: about:addons → Lokal Dublaj sürümü ve `git log -1 --oneline`
+  - type: textarea
+    id: gunluk
+    attributes:
+      label: Günlük (isteğe bağlı)
+      description: "`is\\<video-id>\\gunluk.txt` ya da `is\\sunucu.log` sonundaki hata satırları"
+      render: text

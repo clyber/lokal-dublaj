@@ -4,28 +4,54 @@
 const SUNUCU = "http://127.0.0.1:8799";
 const SAPMA = 0.3; // saniye; bundan fazla kayarsa sesi videoya yeniden hizala
 const sesler = {}; // sekme kimliği -> Audio
+const KOPRU_YOK = "Köprü kurulu değil — lokal-dublaj\\kopru\\kopru-kur.ps1 bir kez çalıştırılmalı";
 
-browser.runtime.onMessage.addListener(async (m, gonderen) => {
-  const sekme = gonderen.tab.id;
-  if (m.tip === "sor") {
+// Sunucu her istekte kurulum belirtecini ister; eklenti onu yalnız köprüden alır (Firefox o kanalı yalnız bu eklentiye açar).
+let belirtec = null, belirtecHatasi = 0;
+async function belirtecAl(yenile) {
+  if (belirtec && !yenile) return belirtec;
+  if (!yenile && Date.now() - belirtecHatasi < 30000) return null; // köprü yoksa her 5 sn'de süreç açmasın
+  try {
+    belirtec = (await browser.runtime.sendNativeMessage("lokal_dublaj", { komut: "belirtec" })).belirtec || null;
+  } catch {
+    belirtec = null;
+  }
+  if (!belirtec) belirtecHatasi = Date.now();
+  return belirtec;
+}
+
+async function sor(yol, yontem) {
+  for (const yenile of [false, true]) { // 401: belirteç değişmiş olabilir (kurulum yenilendi), bir kez tazele
+    const b = await belirtecAl(yenile);
+    if (!b) return { durum: "hata", ilerleme: KOPRU_YOK };
+    let r;
     try {
-      // X-TR-Ses: sunucu iş başlatmayı yalnız bu başlığı yollayan eklentiye açar (web sayfaları yollayamaz)
-      const r = await fetch(SUNUCU + m.yol, { method: m.yontem || "GET", headers: { "X-TR-Ses": "1" } });
-      return await r.json();
+      r = await fetch(SUNUCU + yol, { method: yontem || "GET", headers: { "X-TR-Belirtec": b } });
     } catch {
       return { durum: "sunucu-yok" };
     }
+    if (r.status !== 401) return await r.json();
   }
-  if (m.tip === "sunucuyuAc") { // köprü (kopru/kopru.py) tepsi simgesini ve sunucuyu açar
+  return { durum: "hata", ilerleme: "Sunucu belirteci kabul etmedi; sunucu tarafını güncelle (git pull)" };
+}
+
+browser.runtime.onMessage.addListener(async (m, gonderen) => {
+  const sekme = gonderen.tab.id;
+  if (m.tip === "sor") return sor(m.yol, m.yontem);
+  if (m.tip === "sunucuyuAc") { // köprü (kopru/kopru.py) tepsi simgesini ve sunucuyu açar, belirteci de verir
     try {
-      return await browser.runtime.sendNativeMessage("lokal_dublaj", { komut: "baslat" });
+      const r = await browser.runtime.sendNativeMessage("lokal_dublaj", { komut: "baslat" });
+      if (r.belirtec) belirtec = r.belirtec;
+      return r;
     } catch (e) {
-      return { hata: "Köprü kurulu değil — lokal-dublaj\\kopru\\kopru-kur.ps1 bir kez çalıştırılmalı" };
+      return { hata: KOPRU_YOK };
     }
   }
   if (m.tip === "ac") {
     sesler[sekme]?.pause();
-    const a = new Audio(`${SUNUCU}/ses/${m.vid}.m4a`);
+    const d = await sor(`/durum/${m.vid}`); // ses adresi videoya özel biletle açılır
+    if (!d.bilet) return false;
+    const a = new Audio(`${SUNUCU}/ses/${m.vid}.m4a?b=${d.bilet}`);
     a.preload = "auto";
     sesler[sekme] = a;
     return true;

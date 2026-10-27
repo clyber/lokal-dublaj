@@ -1,13 +1,15 @@
 """Firefox eklentisinin konuştuğu yerel sunucu (yalnız bu bilgisayar: 127.0.0.1:<sunucu.port>, varsayılan 8799).
 
-GET  /durum/<id>          -> {"durum": "hazir"|"hazirlaniyor"|"sirada"|"hata"|"turkce"|"yok", "ilerleme": "..."}
-GET  /bilgi/<id>?sure=sn  -> durum + tahmini hazırlama süresi (ölçülmüş katsayı) + şu an ekran kartındaki video
-GET  /ses/<id>.m4a        -> Türkçe ses (Range destekli: eklenti sarınca sesin ortasından ister)
-POST /hazirla/<id>?ad=... -> cevir.py'yi öncelikli başlatır (yalnız X-TR-Ses başlığıyla: web sayfaları yollayamaz)
-POST /kapat               -> sunucuyu kapatır (başlatıcı kullanır; aynı başlık şartı)
+Her istek X-TR-Belirtec başlığında kurulum belirtecini ister (ortak.belirtec; eklenti köprüden alır), ses adresi
+yalnız o videoya özel bilet (?b=...); Host 127.0.0.1/localhost değilse reddedilir. Yetkisiz istek: 401.
+GET  /durum/<id>          -> {"durum": "hazir"|"hazirlaniyor"|"sirada"|"hata"|"turkce"|"yok", "ilerleme": "..."} (+ hazırsa "bilet")
+GET  /bilgi/<id>?sure=sn  -> durum + tahmini hazırlama süresi (ölçülmüş katsayı) + şu an ekran kartındaki video + model
+GET  /ses/<id>.m4a?b=...  -> Türkçe ses (Range destekli: eklenti sarınca sesin ortasından ister)
+POST /hazirla/<id>?ad=... -> cevir.py'yi öncelikli başlatır
+POST /kapat               -> sunucuyu kapatır (başlatıcı kullanır)
 Çalıştır: baslatici.py (tepsi/pencere) ya da python sunucu.py   (ayarlar: ayarlar.toml)
 """
-import json, re, subprocess, sys, threading, time
+import hmac, json, re, subprocess, sys, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -15,6 +17,8 @@ import ortak
 
 A = ortak.ayar()
 IS = A["calisma_klasoru"]
+PORT = A["sunucu"]["port"]
+BELIRTEC = ortak.belirtec()
 SES = A["ses"]["motor"]
 MOTORLAR = ("ema", "chatterbox", "piper")
 surecler = {}  # bu sunucunun başlattığı işler
@@ -136,13 +140,29 @@ class Isleyici(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    def _yetkili(self, u):
+        """Yalnız bu bilgisayarın adı (DNS yeniden bağlamayla gelen yabancı alan adı reddedilir) ve doğru belirteç;
+        ses adresinde belirteç yerine o videoya özel bilet."""
+        if self.headers.get("Host") not in (f"127.0.0.1:{PORT}", f"localhost:{PORT}"):
+            return False
+        if m := re.fullmatch(r"/ses/([\w-]{11})\.m4a", u.path):
+            return hmac.compare_digest(parse_qs(u.query).get("b", [""])[0], ortak.ses_bileti(m[1]))
+        return hmac.compare_digest(self.headers.get("X-TR-Belirtec", ""), BELIRTEC)
+
+    def _hazirsa_bilet(self, vid, d):
+        if d.get("durum") == "hazir":
+            d["bilet"] = ortak.ses_bileti(vid)
+        return self._json(d)
+
     def do_GET(self):
         u = urlparse(self.path)
+        if not self._yetkili(u):
+            return self._json({"hata": "yetki"}, 401)
         if m := re.fullmatch(r"/durum/([\w-]{11})", u.path):
-            return self._json(durum(m[1]))
+            return self._hazirsa_bilet(m[1], durum(m[1]))
         if m := re.fullmatch(r"/bilgi/([\w-]{11})", u.path):
             sure = float(parse_qs(u.query).get("sure", ["0"])[0] or 0)
-            return self._json(bilgi(m[1], sure))
+            return self._hazirsa_bilet(m[1], bilgi(m[1], sure))
         if m := re.fullmatch(r"/ses/([\w-]{11})\.m4a", u.path):
             f = IS / m[1] / f"turkce-{motor(m[1])}.m4a"
             if not f.exists():
@@ -168,8 +188,8 @@ class Isleyici(BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urlparse(self.path)
-        if self.headers.get("X-TR-Ses") != "1":  # yalnız eklenti: sıradan bir web sayfası bilgisayara iş yaptıramaz
-            return self._json({"hata": "izin yok"}, 403)
+        if not self._yetkili(u):
+            return self._json({"hata": "yetki"}, 401)
         if m := re.fullmatch(r"/hazirla/([\w-]{11})", u.path):
             vid = m[1]
             if durum(vid)["durum"] in ("hazir", "hazirlaniyor", "turkce"):

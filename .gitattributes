@@ -1,0 +1,5 @@
+# Depoda satır sonu LF; Windows betikleri CRLF (cmd ve eski PowerShell için)
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.xpi binary
