@@ -20,6 +20,7 @@ if wavs:  # elde gerçek bir konuşma sesi varsa ilk 20 sn'sini dök
         ses = np.frombuffer(wf.readframes(16000 * 20), dtype=np.int16).astype(np.float32) / 32768
 else:  # yoksa 3 sn sessizlik: yalnız hattın çalıştığı sınanır
     ses = np.zeros(16000 * 3, dtype=np.float32)
+    print("atlandı: gerçek konuşmanın tanınması (elde ses16k.wav yok; sessizlikle yalnız hat sınandı)")
 segs, info = m.transcribe(ses, beam_size=5)
 metin = " ".join(s.text.strip() for s in segs)
 print(f"tamam: yazıya döküm çalıştı (dil {info.language}): {metin[:100] or '(sessizlik)'}")

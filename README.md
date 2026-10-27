@@ -35,7 +35,7 @@ cd lokal-dublaj
 pwsh -File kur.ps1 -Denetle          # neyin eksik olduğunu söyler, hiçbir şeyi değiştirmez
 pwsh -File kur.ps1 -Uygula -WhatIf   # yapılacakları gösterir (yine değişiklik yok)
 pwsh -File kur.ps1 -Uygula           # Python ortamı + paketler (~5 GB) + ayar dosyası + Firefox köprüsü
-pwsh -File kur.ps1 -Dogrula          # öz denetimler, ekran kartı denemesi, güvenlik denetimi
+pwsh -File kur.ps1 -Dogrula          # öz denetimler, ekran kartı ve gerçek çeviri denemesi, güvenlik denetimi (çıkış 2: senin adımın bekliyor)
 ```
 
 `kur.ps1` mevcut ayarlarını, hazırlanmış seslerini ve model önbelleğini korur; ekran kartı sürücüsüne, sistem ayarlarına ve "Windows açılınca başlat"a dokunmaz. Firefox köprüsü, videodaki düğmenin sunucu kapalıyken onu kendisi açmasını ve eklentinin sunucuyla güvenli konuşmasını sağlar (yalnız bu kullanıcı için, yönetici izni gerekmez; kaldırmak için `pwsh -File kopru\kopru-kur.ps1 -Kaldir`; klasörü taşırsan `-Uygula`'yı yeniden çalıştır).
@@ -67,7 +67,7 @@ Ayarları değiştirmek istersen `ayarlar.ornek.toml`'u `ayarlar.toml` adıyla k
 
 ### Güncelleme
 
-Firefox eklentisi kendiliğinden güncellenir. Bilgisayardaki sunucu tarafı güncellenmez; yeni sürüm notunda gerekiyorsa şunu çalıştır, sonra simgeden Çıkış yapıp videoda "TR aç"a bas (ayarların ve hazırlanmış seslerin korunur):
+Firefox eklentisi kendiliğinden güncellenir. Bilgisayardaki sunucu tarafı güncellenmez; yeni sürüm notunda gerekiyorsa önce simgeden Çıkış yap (hazırlanan video varsa bitmesini bekle; `kur.ps1` Lokal Dublaj çalışırken paket kurmaz), sonra şunu çalıştır ve videoda "TR aç"a bas (ayarların ve hazırlanmış seslerin korunur):
 
 ```powershell
 git pull
@@ -76,10 +76,10 @@ pwsh -File kur.ps1 -Uygula
 
 ## Kullanım
 
-1. LM Studio'yu aç, yerel sunucusunu başlat. İlk kullanımda saatin yanındaki Lokal Dublaj simgesine sağ tıkla → **Çeviri modeli** → listeden bir model seç: üç kısa cümlelik deneme çevirisi yapılır, geçerse seçilir (sonuç bildirimle görünür). Birden çok model varken seçim yapılmazsa hazırlama başlamaz; hangi modelin kullanıldığı ▾ panelinde yazar. Yarıda kalan bir video, model değişse de başladığı modelle tamamlanır.
+1. LM Studio'yu aç, yerel sunucusunu başlat. İlk kullanımda saatin yanındaki Lokal Dublaj simgesine sağ tıkla → **Çeviri modeli** → listeden bir model seç: üç kısa cümlelik deneme çevirisi yapılır, geçerse seçilir (sonuç bildirimle görünür). Birden çok model varken seçim yapılmazsa hazırlama başlamaz; hangi modelin kullanıldığı ▾ panelinde yazar. Yarıda kalan bir video, model değişse de başladığı modelle (aynı çeviri adresinde) tamamlanır; önceki modeli bilinmiyorsa ya da artık yoksa düğme **TR baştan çevir** olur: yazıya döküm korunur, çeviri seçili modelle baştan yapılır.
 2. YouTube'da bir video aç; sağ üstte **TR aç** görünür. Basınca saatin yanında Lokal Dublaj simgesi belirir ve sunucu açılır.
 3. **TR hazırla** → ilerleme düğmede ve ▾ panelinde yüzde olarak görünür.
-4. Hazır olunca **TR dinle**. Kapatmak için aynı düğme; sunucuyu kapatmak için simgeye sağ tıkla → Çıkış. O sırada hazırlanan bir video varsa arka planda bitmeye devam eder (simge bunu çıkarken bildirir).
+4. Hazır olunca **TR dinle**. Kapatmak için aynı düğme; sunucuyu kapatmak için simgeye sağ tıkla → Çıkış. O sırada indirilen ya da hazırlanan video varsa arka planda bitmeye devam eder (simge bunu çıkarken bildirir); sunucu kapalıyken düğme kendiliğinden "TR dinle" olmaz, videoda **TR aç**'a basınca sunucu açılır ve hazır ses görünür.
 
 Bir oynatma listesini önden hazırlamak (bağlantıyı tırnak içine al):
 

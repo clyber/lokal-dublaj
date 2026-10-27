@@ -9,6 +9,7 @@
 
   let vid = null, video = null, dugme = null, bilgiDugme = null, panel = null;
   let acik = false, eskiSes = 1, sayac = null, son = {};
+  let uyari = ""; // son basışın sonucu (iş sınırı dolu, ses açılamadı); panelde görünür, sonraki basışta silinir
 
   const videoId = () => new URLSearchParams(location.search).get("v");
   const reklamVar = () => document.querySelector("#movie_player")?.classList.contains("ad-showing");
@@ -58,7 +59,12 @@
   async function ac() {
     video = document.querySelector("#movie_player video");
     if (!video) return;
-    if (!(await browser.runtime.sendMessage({ tip: "ac", vid }))) return; // ses bileti alınamadı (sunucu/köprü)
+    const r = await browser.runtime.sendMessage({ tip: "ac", vid });
+    if (r !== true) { // ses bileti alınamadı (sunucu/köprü): sessizce dönme, sebebi panelde göster
+      uyari = `Türkçe ses açılamadı: ${r?.hata || "bilinmeyen sebep"}. Düğmeye yeniden bas.`;
+      if (!panel) paneliAcKapa();
+      return;
+    }
     eskiSes = video.volume;
     for (const [o, f] of Object.entries(olaylar)) video.addEventListener(o, f);
     acik = true;
@@ -88,7 +94,7 @@
       d.durum === "sirada" ? ["TR sırada", "#b36b00"] :
       d.durum === "sunucu-yok" ? ["TR aç", "#444"] :
       d.durum === "aciliyor" ? ["TR açılıyor…", "#b36b00"] :
-      d.durum === "hata" ? ["TR hata · yeniden dene", "#8a1c1c"] :
+      d.durum === "hata" ? [d.yeniden_cevir ? "TR baştan çevir" : "TR hata · yeniden dene", "#8a1c1c"] :
       d.durum === "yarim" ? ["TR devam et", "#b36b00"] :
       d.durum === "turkce" ? ["Zaten TR", "#444"] :
       d.durum === "yok" ? ["TR hazırla", "#444"] : ["TR …", "#444"];
@@ -99,6 +105,7 @@
 
   async function anaEylem() {
     const d = son;
+    uyari = "";
     if (acik) kapat();
     else if (d.durum === "sunucu-yok") {
       // Sunucu kapalı: köprü tepsi simgesini ve sunucuyu açar
@@ -108,7 +115,15 @@
       if (r?.hata) { son = { durum: "hata", ilerleme: r.hata }; dugmeYaz(); return paneliAcKapa(); }
     }
     else if (d.durum === "hazir") await ac();
-    else if (["yok", "hata", "yarim"].includes(d.durum)) await sor(`/hazirla/${vid}?ad=${encodeURIComponent(baslik())}`, "POST");
+    else if (["yok", "hata", "yarim"].includes(d.durum)) {
+      // köken hatası: önceki yarım çevirinin modeli bilinmiyor/uyuşmuyor → seçili modelle baştan çevir (yazıya döküm saklı)
+      const ek = d.yeniden_cevir ? "&cevir=yeniden" : "";
+      const r = await sor(`/hazirla/${vid}?ad=${encodeURIComponent(baslik())}${ek}`, "POST");
+      if (r?.durum === "dolu" || r?.durum === "hata" || r?.hata) { // ör. aynı anda en çok 3 video: sebebi göster
+        uyari = r.ilerleme || r.hata;
+        if (!panel) paneliAcKapa();
+      }
+    }
     else return paneliAcKapa(); // hazırlanıyor / sırada / sunucu kapalı: ayrıntıyı göster
     yenile();
   }
@@ -157,13 +172,14 @@
       d.durum === "hazir" ? (acik ? "Türkçe ses açık" : "Türkçe ses hazır") :
       d.durum === "yok" ? "Bu video için Türkçe ses yok" :
       d.durum === "turkce" ? "Video zaten Türkçe konuşuyor, çeviriye gerek yok" :
-      d.durum === "hata" ? `Hata: ${d.ilerleme} — üstteki düğmeyle yeniden dene` :
+      d.durum === "hata" ? (d.yeniden_cevir ? `${d.ilerleme}` : `Hata: ${d.ilerleme} — üstteki düğmeyle yeniden dene`) :
       d.durum === "sunucu-yok" ? "Sunucu kapalı — üstteki düğmeye basınca açılır" :
       d.ilerleme || "Hazırlanıyor"));
     if (!["turkce", "sunucu-yok"].includes(d.durum) && d.durum)
       panel.append(satir("Çeviri modeli",
         d.durum === "hazir" ? (d.model ? `${d.model} ile çevrildi` : "kayıt yok (önceki sürüm)") :
         d.model || d.yeni_model || "seçilmedi — saatin yanındaki simgeden seç"));
+    if (uyari) panel.append(satir("Uyarı", uyari));
     if (d.gpu_mesgul && d.durum !== "hazir")
       panel.append(satir("Ekran kartında şimdi", `${d.gpu_mesgul.ad} · ${d.gpu_mesgul.ilerleme || ""}`));
     // Panel yalnız bilgi verir; iş yapan tek düğme üstteki ana düğme
@@ -177,7 +193,8 @@
   }
 
   async function yenile() {
-    const sure = document.querySelector("#movie_player video")?.duration || 0;
+    const s = document.querySelector("#movie_player video")?.duration;
+    const sure = Number.isFinite(s) ? s : 0; // canlı yayında Infinity: sunucu sonlu süre ister (aksi 400)
     const istenen = vid;
     son = await sor(`/bilgi/${vid}?sure=${Math.round(sure)}`);
     if (istenen !== videoId() || !dugme) return;

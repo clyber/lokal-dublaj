@@ -52,6 +52,25 @@ def durdur():
         pass
 
 
+_secim_kilidi = threading.Lock()
+
+
+def tek_secim(son, kimlik):
+    """Model denemesi sürerken ikinci seçim yok sayılır. Bayrak thread açılmadan, kilit altında konur: çift tıklamada
+    iki deneme aynı ayarlar.tmp'ye yazamaz (R6-06). Döner: bu seçim başlatılsın mı."""
+    with _secim_kilidi:
+        if son["deneniyor"]:
+            return False
+        son["deneniyor"] = kimlik
+        return True
+
+
+def suren_isler(is_kok):
+    """Video kilidini (.is-kilit) yaşayan bir sürecin tuttuğu klasörler: indiren, ekran kartı sırası bekleyen,
+    hazırlanan her iş (yalnız ekran kartındaki değil, R6-08)."""
+    return [f.parent.name for f in is_kok.glob("*/.is-kilit") if ortak.kilitli(f)]
+
+
 def acilista():
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN) as k:
@@ -99,8 +118,8 @@ def tepsi():
         ikon.update_menu()
 
     def model_sec(kimlik):
-        """Önce 3 cümlelik deneme çevirisi; ancak geçerse ayara yazılır. Sonuç bildirimle (çeviriler görünsün)."""
-        son["deneniyor"] = kimlik
+        """Önce 3 cümlelik deneme çevirisi; ancak geçerse ayara yazılır. Sonuç bildirimle (çeviriler görünsün).
+        Bayrağı (son["deneniyor"]) çağıran tek_secim ile koymuş olmalı."""
         ikon.update_menu()
         ikon.notify(f"{kimlik} deneniyor; model belleğe yükleniyorsa 1 dakikayı bulabilir.", "Lokal Dublaj · çeviri modeli")
         try:
@@ -119,17 +138,18 @@ def tepsi():
             yield pystray.MenuItem("Sunucuda sohbet modeli yok", None, enabled=False)
         for k, bellekte in son["modeller"] or []:
             ek = " · deneniyor…" if son["deneniyor"] == k else " · bellekte" if bellekte else ""
-            yield pystray.MenuItem(k + ek, (lambda k: lambda: threading.Thread(target=model_sec, args=(k,)).start())(k),
+            yield pystray.MenuItem(k + ek, (lambda k: lambda: tek_secim(son, k) and threading.Thread(target=model_sec, args=(k,)).start())(k),
                                    checked=(lambda k: lambda _: son["secili"] == k)(k), radio=True,
                                    enabled=not son["deneniyor"])
         yield pystray.Menu.SEPARATOR
         yield pystray.MenuItem("Listeyi yenile", lambda: threading.Thread(target=modelleri_yenile).start())
 
     def cikis(i):
-        # süren hazırlama ayrı süreç (cevir.py): sunucu kapanınca da biter; kullanıcı "iptal oldu" sanmasın
-        if son["metin"].startswith("Hazırlanıyor"):
-            i.notify("Hazırlanan video arka planda bitmeye devam ediyor; bitince videoda \"TR dinle\" görünür.",
-                     "Lokal Dublaj")
+        # süren işler ayrı süreç (cevir.py): sunucu kapanınca da biter; kullanıcı "iptal oldu" sanmasın. Sunucu kapalıyken
+        # düğme kendiliğinden "TR dinle" olmaz: kullanıcı "TR aç"a basar, sunucu açılınca hazır ses görünür.
+        if n := len(suren_isler(ortak.ayar()["calisma_klasoru"])):
+            i.notify(f"{n} video arka planda hazırlanmaya devam ediyor. Bitince videoda \"TR aç\"a bas; hazırsa "
+                     "\"TR dinle\" görünür.", "Lokal Dublaj")
             time.sleep(3)  # bildirim simge kalkmadan gösterilsin
         durdur()
         i.stop()

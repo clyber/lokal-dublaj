@@ -1,7 +1,7 @@
 """Güvenilirlik öz denetimi: eksik çeviri, bayat yarım indirme, ölen iş. Ekran kartı ve internet gerekmez.
 Çalıştır: python araclar/guvenilirlik_denetimi.py   — her satır "tamam" ya da hata.
 """
-import json, os, shutil, sys, tempfile, time
+import json, os, shutil, sys, tempfile, threading, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -60,5 +60,28 @@ try:
         assert r.stdout.strip() == "hazirlaniyor", f"K03: kilit tutulurken durum {r.stdout!r} {r.stderr[-300:]}"
         ortak.kilit_birak(f)
     print("tamam K03: süreç ölünce 'yarim', yaşarken 'hazirlaniyor'")
+
+    # R6-08: çıkış bildirimi kilidi tutulan her işi görmeli (indiren/sıra bekleyen dahil), bitmiş/ölmüş işi değil
+    import baslatici
+    d5 = gecici / "suren"; d5.mkdir(); d6 = gecici / "olmus"; d6.mkdir()
+    (d6 / ".is-kilit").touch()
+    with open(d5 / ".is-kilit", "a+") as f:
+        assert ortak.kilit_dene(f)
+        assert baslatici.suren_isler(gecici) == ["suren"], baslatici.suren_isler(gecici)
+        ortak.kilit_birak(f)
+    assert baslatici.suren_isler(gecici) == []
+    print("tamam R6-08: çıkışta süren işler kilitten bulunuyor")
+
+    # R6-06: çift tıklama — aynı anda gelen iki model seçiminden yalnız biri denemeye başlar
+    son = {"deneniyor": None}
+    engel = threading.Barrier(8)
+    sonuclar = []
+    def sec(k):
+        engel.wait()
+        sonuclar.append(baslatici.tek_secim(son, k))
+    t = [threading.Thread(target=sec, args=(f"m{i}",)) for i in range(8)]
+    [x.start() for x in t]; [x.join() for x in t]
+    assert sonuclar.count(True) == 1 and son["deneniyor"], sonuclar
+    print("tamam R6-06: eşzamanlı model seçimlerinden yalnız biri başlıyor")
 finally:
     shutil.rmtree(gecici, ignore_errors=True)

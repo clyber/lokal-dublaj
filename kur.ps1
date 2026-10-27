@@ -3,7 +3,10 @@ Lokal Dublaj kurulum betiği (Windows, PowerShell 7). Kipler; parametresiz çal�
   pwsh -File kur.ps1 -Denetle          ortamı okur, eksikleri ve planı yazar; hiçbir şeyi değiştirmez
   pwsh -File kur.ps1 -Uygula -WhatIf   yapılacakları gösterir, yine hiçbir şeyi değiştirmez
   pwsh -File kur.ps1 -Uygula           Python ortamı, paketler, ayar dosyası, Firefox köprüsü
-  pwsh -File kur.ps1 -Dogrula          öz denetimler, ekran kartı denemesi, sunucu ve güvenlik denetimi
+  pwsh -File kur.ps1 -Dogrula          öz denetimler, ekran kartı ve gerçek çeviri denemesi, sunucu ve güvenlik denetimi
+                                       (çıkış 0 geçti, 1 hata, 2 kullanıcı adımı bekliyor / atlanan kontrol var)
+-WhatIf yalnız -Uygula ile; .venv bağlantıysa, Python 3.13 64 bit değilse ya da bu depodan bir Lokal Dublaj süreci
+çalışıyorsa -Uygula hiçbir şeyi değiştirmeden durur.
 Korunanlar: mevcut ayarlar.toml, is/ (hazırlanmış sesler), model önbelleği. Dokunulmayanlar: ekran kartı sürücüsü,
 sistem/güvenlik ayarları, "Windows açılınca başlat", LM Studio. Firefox eklentisini kurmak ve izinleri onaylamak kullanıcıdadır.
 #>
@@ -14,6 +17,9 @@ param(
     [Parameter(ParameterSetName = 'Dogrula')][switch]$Dogrula
 )
 $ErrorActionPreference = 'Stop'
+if ($WhatIfPreference -and $PSCmdlet.ParameterSetName -ne 'Uygula') {  # -Dogrula sunucu açar, model indirir: önizlemesi yok
+    throw '-WhatIf yalnız -Uygula ile kullanılır (önizleme: pwsh -File kur.ps1 -Uygula -WhatIf).'
+}
 $kok = $PSScriptRoot
 $py = Join-Path $kok '.venv\Scripts\python.exe'
 $env:PYTHONIOENCODING = 'utf-8'
@@ -37,8 +43,22 @@ function Denetim {
     Ekle 'NVIDIA ekran kartı' ($(if ($gpu) { 'tamam' } else { 'eksik' })) "$(if ($gpu) { $gpu } else { 'nvidia-smi yok: sürücü kurulu mu?' })"
     $bos = [math]::Round((Get-PSDrive (Split-Path $kok -Qualifier).TrimEnd(':')).Free / 1GB, 1)
     Ekle 'Boş disk' ($(if ($bos -ge 12) { 'tamam' } else { 'uyari' })) "$bos GB (ortam ~5 GB + modeller ~2 GB + videolar)"
+    # .venv: bağlantıysa paketler başka bir ortama kurulurdu (R6-02) -> dur; hedefe hiç dokunulmaz
     $v = Get-Item -LiteralPath (Join-Path $kok '.venv') -Force -ErrorAction SilentlyContinue
-    Ekle 'Python ortamı (.venv)' ($(if (-not $v) { 'kurulacak' } elseif ($v.LinkType) { 'uyari' } else { 'var' })) "$(if ($v.LinkType) { "bağlantı -> $($v.Target) (gerçek klasör önerilir)" } elseif ($v) { 'mevcut, paketler güncellenir' })"
+    if (-not $v) { Ekle 'Python ortamı (.venv)' 'kurulacak' 'Python 3.13 ile oluşturulacak' }
+    elseif ($v.LinkType) { Ekle 'Python ortamı (.venv)' 'eksik' "bağlantı ($($v.LinkType)) -> $($v.Target): bağlantıyı kaldırıp gerçek klasör kur; hedefine dokunulmaz" }
+    else {
+        $vp = if (Test-Path $py) { try { & $py -c "import sys,struct;print(sys.version.split()[0], struct.calcsize('P')*8)" 2>$null } catch { $null } }
+        if ("$vp" -match '^3\.13\.\d+ 64$') { Ekle 'Python ortamı (.venv)' 'var' "Python $($vp -replace ' 64$', '') 64 bit; paketler güncellenir" }
+        else { Ekle 'Python ortamı (.venv)' 'eksik' "$(if ($vp) { "Python $vp bit" } else { 'python.exe yok ya da çalışmıyor' }): Python 3.13 64 bit değil; .venv klasörünü kaldırıp yeniden kur" }
+    }
+    # çalışan Lokal Dublaj: paketler kullanımdayken değişmesin (komut satırında bu depo + sunucu/cevir/baslatici/toplu)
+    $calisan = @(Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object {
+        $_.CommandLine -and $_.CommandLine.IndexOf($kok, [StringComparison]::OrdinalIgnoreCase) -ge 0 -and $_.CommandLine -match '(sunucu|cevir|baslatici|toplu)\.py' })
+    if ($calisan) {
+        $adlar = ($calisan.CommandLine | ForEach-Object { [regex]::Match($_, '\w+\.py').Value } | Sort-Object -Unique) -join ', '
+        Ekle 'Çalışan Lokal Dublaj' 'dur' "$adlar (süreç $($calisan.ProcessId -join ', ')): simgeden Çıkış yap / hazırlanan video bitsin, sonra -Uygula"
+    } else { Ekle 'Çalışan Lokal Dublaj' 'tamam' 'yok' }
     Ekle 'ayarlar.toml' ($(if (Test-Path (Join-Path $kok 'ayarlar.toml')) { 'var' } else { 'kurulacak' })) 'varsa korunur; yoksa örnekten kopyalanır'
     $kopru = Get-ItemProperty 'HKCU:\Software\Mozilla\NativeMessagingHosts\lokal_dublaj' -ErrorAction SilentlyContinue
     Ekle 'Firefox köprüsü' ($(if ($kopru) { 'var' } else { 'kurulacak' })) "$(if ($kopru) { $kopru.'(default)' })"
@@ -62,7 +82,9 @@ if ($PSCmdlet.ParameterSetName -eq 'Denetle') {
     $d = Denetim
     $d | Format-Table -AutoSize -Wrap
     $eksik = @($d | Where-Object Durum -eq 'eksik')
-    if ($eksik) { "ÖNCE KUR: $($eksik.Bilesen -join ', ') (README → Gerekenler). Sonra yeniden: pwsh -File kur.ps1 -Denetle"; exit 1 }
+    if ($eksik) { "ÖNCE DÜZELT: $($eksik.Bilesen -join ', ') (Ayrıntı sütunu; README → Gerekenler). Sonra yeniden: pwsh -File kur.ps1 -Denetle"; exit 1 }
+    $dur = @($d | Where-Object Durum -eq 'dur')
+    if ($dur) { "-Uygula şu an DURUR: $($dur.Ayrinti -join '; ')" }
     'Plan (pwsh -File kur.ps1 -Uygula ile uygulanır; önce -Uygula -WhatIf ile görebilirsin):'
     '  1. .venv yoksa Python 3.13 ile oluştur'
     '  2. PyTorch 2.11.0 (CUDA 12.8) ve requirements.txt paketlerini kur (~5 GB indirme, ilk kurulumda)'
@@ -73,13 +95,17 @@ if ($PSCmdlet.ParameterSetName -eq 'Denetle') {
 }
 
 if ($PSCmdlet.ParameterSetName -eq 'Uygula') {
-    $eksik = @(Denetim | Where-Object Durum -eq 'eksik')
-    if ($eksik) { throw "Eksik ön koşul: $($eksik.Bilesen -join ', '). Önce bunları kur (README → Gerekenler)." }
+    $engel = @(Denetim | Where-Object Durum -in 'eksik', 'dur')
+    if ($engel) {
+        $neden = "-Uygula DURDU, hiçbir şey değiştirilmedi: $(($engel | ForEach-Object { "$($_.Bilesen): $($_.Ayrinti)" }) -join ' | ')"
+        if (-not $WhatIfPreference) { throw $neden }
+        $neden; 'Engel kalkınca yapılacaklar:'  # önizlemede engeli göster, planı yine de listele
+    }
     if (-not (Test-Path (Join-Path $kok '.venv'))) {
         if ($PSCmdlet.ShouldProcess("$kok\.venv", 'Python 3.13 ortamı oluştur')) { py -3.13 -m venv (Join-Path $kok '.venv'); if ($LASTEXITCODE) { throw 'venv oluşturulamadı' } }
     }
     if ($PSCmdlet.ShouldProcess('.venv', 'pip güncelle + PyTorch 2.11.0 (CUDA 12.8) kur')) {
-        & $py -m pip install -q --upgrade pip
+        & $py -m pip install -q --upgrade pip; if ($LASTEXITCODE) { throw 'pip güncellenemedi' }
         & $py -m pip install -q torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
         if ($LASTEXITCODE) { throw 'PyTorch kurulamadı' }
     }
@@ -98,19 +124,30 @@ if ($PSCmdlet.ParameterSetName -eq 'Uygula') {
         '  2. LM Studio''da bir sohbet modeli indir (denenen: gemma-4-12b-it), Developer → Start Server'
         '  3. Doğrula: pwsh -File kur.ps1 -Dogrula'
     }
-    exit 0
+    exit ($(if ($engel) { 1 } else { 0 }))
 }
 
 if ($PSCmdlet.ParameterSetName -eq 'Dogrula') {
     if (-not (Test-Path $py)) { throw 'Python ortamı yok: önce pwsh -File kur.ps1 -Uygula' }
-    $hata = 0
-    foreach ($t in 'model_denetimi', 'guvenilirlik_denetimi', 'hata_denetimi', 'gpu_denetimi') {
-        "== $t"; & $py (Join-Path $kok "araclar\$t.py"); if ($LASTEXITCODE) { $hata++; "HATA: $t" }
+    $hata = 0; $bekleyen = @(); $atlanan = @()
+    foreach ($t in 'model_denetimi', 'guvenilirlik_denetimi', 'hata_denetimi', 'sunucu_denetimi', 'gpu_denetimi', 'ceviri_denemesi', 'sunucu', 'guvenlik_denetimi') {
+        "== $t"
+        $o = if ($t -eq 'sunucu') {  # sunucuyu simgenin yaptığı gibi aç; açılmazsa çıkış kodu 1
+            & $py -c "import sys; sys.path.insert(0, r'$kok'); import baslatici; baslatici.baslat(); print('tamam: sunucu açık') if baslatici.durum()[0] else sys.exit('HATA: sunucu açılamadı (is\\sunucu.log)')" 2>&1
+        } else { & $py (Join-Path $kok "araclar\$t.py") 2>&1 }
+        $kod = $LASTEXITCODE
+        $o = @($o | ForEach-Object { "$_" }); $o
+        $atlanan += @($o | Where-Object { $_ -like 'atlandı:*' } | ForEach-Object { "$t — $_" })
+        if ($kod -eq 2 -and $t -eq 'ceviri_denemesi') { $bekleyen += @($o | Where-Object { $_ -like 'KULLANICI ADIMI*' } | ForEach-Object { $_ -replace '^KULLANICI ADIMI BEKLİYOR:\s*' }) }
+        elseif ($kod) { $hata++; "HATA: $t (çıkış $kod)" }
     }
-    "== sunucu"
-    & $py -c "import sys; sys.path.insert(0, r'$kok'); import baslatici; baslatici.baslat(); print('tamam: sunucu açık' if baslatici.durum()[0] else 'HATA: sunucu açılamadı')"
-    "== guvenlik_denetimi"; & $py (Join-Path $kok 'araclar\guvenlik_denetimi.py'); if ($LASTEXITCODE) { $hata++; 'HATA: guvenlik_denetimi' }
-    if ($hata) { "$hata denetim başarısız."; exit 1 }
+    if ($hata) { "$hata denetim BAŞARISIZ."; exit 1 }
+    if ($bekleyen -or $atlanan) {  # hata yok ama kabul eksik: başarı sayılmaz
+        if ($bekleyen) { 'KULLANICI ADIMI BEKLİYOR:'; $bekleyen | ForEach-Object { "  $_" } }
+        if ($atlanan) { 'Atlanan kontroller (başarı sayılmadı):'; $atlanan | ForEach-Object { "  $_" } }
+        'Hata yok; yukarıdakiler tamamlanınca -Dogrula''yı yeniden çalıştır.'
+        exit 2
+    }
     'OTOMATİK DENETİMLER GEÇTİ. Son adım senin: Firefox''ta bir videoda "TR aç" → "TR hazırla" → "TR dinle"; durdur ve sar.'
     exit 0
 }

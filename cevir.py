@@ -62,8 +62,8 @@ def indir(url, d):
 
 def yaziya_dok(a, d):
     f = d / "parcalar.json"
-    if f.exists():
-        return json.loads(f.read_text("utf-8"))
+    if (p := ortak.json_oku(f)) is not None:  # eski sürümden yarım/bozuk kalmışsa yeniden dökülür
+        return p
     import numpy as np
     from faster_whisper import WhisperModel
     try:
@@ -78,23 +78,40 @@ def yaziya_dok(a, d):
         raise Hata("Videoda konuşma bulunamadı.")
     print(f"dil={info.language} parca={len(p)}")
     (d / "dil.txt").write_text(info.language, "utf-8")
-    f.write_text(json.dumps(p, ensure_ascii=False, indent=1), "utf-8")
+    ortak.json_yaz(f, p)
     return p
 
 
+BASTAN = "Düğmeye basarsan seçili modelle baştan çevrilir (yazıya döküm saklı)."
+
+
+def ceviri_eksik(d):
+    """Yarım çeviri var mı: ceviri.json var ama parcalar.json'daki her parçayı kapsamıyor."""
+    tr, p = ortak.json_oku(d / "ceviri.json"), ortak.json_oku(d / "parcalar.json")
+    return tr is not None and (p is None or any(str(x["id"]) not in tr for x in p))
+
+
 def ceviri_modeli(d):
-    """Bu videonun çeviri modeli. Yarıda kalmış iş başladığı modelle sürer (iki modelin çevirisi aynı videoda
-    karışmasın); yeni işte ayardaki model. Seçim yoksa ve tek sohbet modeli varsa o; birden çoksa sessizce ilkini
-    almak yerine kullanıcıdan seçmesi istenir. Seçilen model video klasöründe uretim.json'a yazılır."""
-    adres = A["ceviri"]["adres"]
+    """Bu videonun çeviri modeli. Yarıda kalmış çeviri başladığı sunucu adresi + modelle sürer (iki modelin çevirisi
+    aynı videoda karışmasın); kökeni bilinmiyor ya da uyuşmuyorsa sessizce devam edilmez, baştan çevirme önerilir.
+    Yeni işte ayardaki model. Seçim yoksa ve tek sohbet modeli varsa o; birden çoksa sessizce ilkini almak yerine
+    kullanıcıdan seçmesi istenir. Seçilen adres + model video klasöründe uretim.json'a yazılır."""
+    adres = A["ceviri"]["adres"].rstrip("/")
     var = [k for k, _ in ortak.model_listesi(adres)]
     kayit = d / "uretim.json"
-    if kayit.exists() and (d / "ceviri.json").exists():
-        model = json.loads(kayit.read_text("utf-8"))["model"]
+    if ceviri_eksik(d):
+        k = ortak.json_oku(kayit) or {}
+        model = k.get("model")
+        if not model:  # kaydı olmayan eski sürüm işi (ya da kaydı bozuk): modeli bilinmiyor, kayıt uydurulmaz
+            raise Hata("Önceki çevirinin modeli bilinmiyor (eski sürümden yarım kalmış). " + BASTAN, yeniden_cevir=True)
+        if (k.get("adres") or "").rstrip("/") != adres:
+            raise Hata(f"Bu video {model} modeliyle {k.get('adres') or 'bilinmeyen bir adreste'} yarıda kalmıştı; ayardaki "
+                       f"çeviri adresi farklı ({adres}). Adresi geri al ya da: " + BASTAN, yeniden_cevir=True)
         if model not in var:
-            raise Hata(f"Bu video {model} modeliyle yarıda kalmıştı; o model çeviri sunucusunda yok. LM Studio'da geri yükle.")
+            raise Hata(f"Bu video {model} modeliyle yarıda kalmıştı; o model çeviri sunucusunda yok. LM Studio'da geri "
+                       "yükle ya da: " + BASTAN, yeniden_cevir=True)
         return model
-    eski = (d / "ceviri.json").exists()  # kaydı olmayan eski sürüm işi: modeli bilinmiyor, kayıt uydurulmaz
+    eski = ortak.json_oku(d / "ceviri.json") is not None  # çevirisi tamam (yalnız ses kalmış): kayıt uydurulmaz
     model = A["ceviri"]["model"]
     if not model:
         if len(var) != 1:
@@ -104,13 +121,26 @@ def ceviri_modeli(d):
     elif model not in var:
         raise Hata(f"Seçili çeviri modeli ({model}) sunucuda yok. Simgeden başka bir model seç.")
     if not eski:
-        kayit.write_text(json.dumps({"model": model, "baslangic": time.strftime("%Y-%m-%dT%H:%M:%S%z")}), "utf-8")
+        ortak.json_yaz(kayit, {"model": model, "adres": adres, "baslangic": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
     return model
+
+
+def ceviriyi_sil(d):
+    """--yeniden-cevir: çeviriyi ve ondan türeyen sesi siler, yazıya dökümü (parcalar.json) korur. Hazır videoya
+    (bitti-*) dokunmaz: o zaman False."""
+    import shutil
+    if any(d.glob("bitti-*")):
+        return False
+    for f in [d / "ceviri.json", d / "ceviri.tmp", d / "uretim.json", *d.glob("turkce-*")]:
+        f.unlink(missing_ok=True)
+    for s in d.glob("tts-*"):
+        shutil.rmtree(s, ignore_errors=True)
+    return True
 
 
 def cevir(p, d, model):
     f = d / "ceviri.json"
-    tr = json.loads(f.read_text("utf-8")) if f.exists() else {}
+    tr = ortak.json_oku(f) or {}
     n = A["ceviri"]["grup_boyu"]
     def grup_cevir(grup, onceki):
         try:
@@ -133,13 +163,12 @@ def cevir(p, d, model):
                 print("UYARI: çeviri çözülemedi, grup sonraki turda yeniden istenecek")
                 continue
             tr.update(yeni)
-            gecici = f.with_suffix(".tmp")  # yarım dosyayı sunucu okumasın: yaz, sonra tek hamlede değiştir
-            gecici.write_text(json.dumps(tr, ensure_ascii=False, indent=1), "utf-8")
-            gecici.replace(f)
+            ortak.json_yaz(f, tr)  # yarım dosyayı sunucu okumasın
             print(f"çeviri {len(tr)}/{len(p)}")
     eksik = [x["id"] for x in p if str(x["id"]) not in tr]
     if eksik:  # eksik cümleyle "hazır" demek, dinleyene bazı cümleleri hiç duyurmamak demek (K01)
-        raise Hata(f"Çevirinin {len(eksik)}/{len(p)} parçası alınamadı. Yeniden dene (alınanlar saklı); sürerse çeviri modelini değiştir.")
+        # kayıtlı iş aynı modelle sürer (M01): simgeden model değiştirmek bu videoyu etkilemez, o yüzden önerilmez
+        raise Hata(f"Çevirinin {len(eksik)}/{len(p)} parçası alınamadı. Yeniden dene (alınanlar saklı, aynı modelle sürer).")
     return tr
 
 
@@ -248,6 +277,8 @@ if __name__ == "__main__":
     ap.add_argument("--ses", choices=["ema", "chatterbox", "piper"], default=A["ses"]["motor"])
     ap.add_argument("--ad", help="mp4 üretilirse çıktı dosyasının adı (uzantısız)")
     ap.add_argument("--oncelik", action="store_true", help="eklentiden gelen istek: toplu işin önüne geçer")
+    ap.add_argument("--yeniden-cevir", action="store_true",
+                    help="çeviriyi ve sesini silip seçili modelle baştan çevir (yazıya döküm saklı; hazır videoya dokunmaz)")
     g = ap.parse_args()
     vid = ortak.video_id(g.url)
     g.url = f"https://www.youtube.com/watch?v={vid}"
@@ -259,7 +290,11 @@ if __name__ == "__main__":
     if not ortak.kilit_dene(is_kilidi):
         print("Bu video zaten hazırlanıyor, ikinci iş açılmadı.")
         raise SystemExit(0)
+    if g.yeniden_cevir and not ceviriyi_sil(d):
+        print("Bu videonun Türkçe sesi hazır; baştan çevirme yapılmadı.")
+        raise SystemExit(0)
     (d / "hata.txt").unlink(missing_ok=True)
+    (d / "koken-hatasi").unlink(missing_ok=True)
     isaret = IS / f".oncelik-{vid}"
     if g.oncelik:
         isaret.touch()
@@ -268,6 +303,8 @@ if __name__ == "__main__":
     except Exception as e:
         mesaj = str(e) if isinstance(e, Hata) else f"Beklenmeyen hata: {type(e).__name__}: {e}"
         (d / "hata.txt").write_text(mesaj, "utf-8")
+        if getattr(e, "yeniden_cevir", False):  # eklenti düğmesi bu işarete bakıp baştan çevirmeyi önerir
+            (d / "koken-hatasi").touch()
         print("HATA:", mesaj, file=sys.stderr)
         raise SystemExit(1)
     finally:

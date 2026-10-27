@@ -10,7 +10,7 @@
 2. `pwsh -File kur.ps1 -Denetle` çalıştır. Çıktıdaki tabloyu kullanıcıya Türkçe ve kısa özetle. **eksik** satırı varsa dur: o ön koşulu (Git, PowerShell 7, Python 3.13 64 bit, Node.js 22+, ffmpeg, NVIDIA sürücüsü) nasıl kuracağını resmî kaynakla söyle; kendi kendine sürücü kurma.
 3. `pwsh -File kur.ps1 -Uygula -WhatIf` çalıştır; yapılacakları, indirme boyutunu (ilk kurulumda ~5 GB Python paketi, ilk kullanımda ~1,6 GB yazıya dökme modeli) ve Firefox köprüsünün HKCU kaydını göster. **Kullanıcının açık onayını al.**
 4. Onaydan sonra `pwsh -File kur.ps1 -Uygula`. Kapsam değişirse (örn. betik farklı bir şey istiyorsa) yeniden sor.
-5. `pwsh -File kur.ps1 -Dogrula`. Başarısız satırı olduğu gibi bildir; tahminle yeni paket deneme zinciri kurma.
+5. `pwsh -File kur.ps1 -Dogrula`. Başarısız satırı olduğu gibi bildir; tahminle yeni paket deneme zinciri kurma. Çıkış 2 başarı değildir: "KULLANICI ADIMI BEKLİYOR" (LM Studio/model) ve "atlandı" satırlarını kullanıcıya ayrı yaz. `-Uygula` "DURDU" derse (bağlantılı `.venv`, yanlış Python, çalışan Lokal Dublaj) sebebi kullanıcıya söyle; bağlantının hedefine ya da çalışan sürece kendiliğinden dokunma.
 6. Kullanıcı adımlarını yönlendir, bunları kendin yaptığını iddia etme:
    - Firefox eklentisi: https://github.com/clyber/lokal-dublaj/releases/latest → `.xpi` dosyasını Firefox'a sürükle, izinleri **kullanıcı** onaylar.
    - LM Studio: bir sohbet modeli indir (denenen: `gemma-4-12b-it`), Developer → Start Server.

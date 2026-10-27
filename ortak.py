@@ -67,6 +67,39 @@ def kilit_birak(f):
         fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
+def kilitli(f):
+    """Bu kilit dosyasını yaşayan bir süreç tutuyor mu (dosya yoksa hayır). Video kilidi (.is-kilit): iş sürüyor mu."""
+    if not f.exists():
+        return False
+    with open(f, "a+") as h:
+        if kilit_dene(h):
+            kilit_birak(h)
+            return False
+    return True
+
+
+def json_oku(f):
+    """JSON dosyası; yoksa ya da yarım/bozuksa None (okuyan çökmesin, R6-07)."""
+    try:
+        return json.loads(Path(f).read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def json_yaz(f, veri):
+    """Atomik yazım: geçici dosya, sonra tek hamlede değiştir; okuyan yarım dosya görmez, kesinti yarım kayıt bırakmaz.
+    Windows'ta o an dosyayı okuyan varsa değiştirme kısa süre reddedilir: birkaç kez yeniden denenir."""
+    gecici = Path(f).with_suffix(".tmp")
+    gecici.write_text(json.dumps(veri, ensure_ascii=False, indent=1), "utf-8")
+    for i in range(20):
+        try:
+            return gecici.replace(f)
+        except PermissionError:
+            if i == 19:
+                raise
+            time.sleep(0.05)
+
+
 def gpu_kilidi(is_kok, oncelik=False):
     """Aynı anda tek video ekran kartında. Eklentiden gelen istek (oncelik) bekliyorsa toplu işin sıradakisi yol verir."""
     f = open(is_kok / ".gpu-kilit", "a+")
@@ -104,7 +137,12 @@ def belirtec():
         if b := f.read_text().strip():
             return b
         time.sleep(0.02)
-    raise Hata("belirteç dosyası boş: " + str(f))
+    # 1 sn sonra hâlâ boş: üreten süreç yazamadan ölmüş. Yeniden üret, atomik yerleştir, dosyada kalanı döndür.
+    # ponytail: tam bu anda iki süreç birden yeniden üretirse biri eski değeri tutabilir; sunucuyu yeniden açmak düzeltir.
+    gecici = f.with_name(f".belirtec.{os.getpid()}.tmp")
+    gecici.write_text(secrets.token_urlsafe(32))
+    gecici.replace(f)
+    return f.read_text().strip()
 
 
 def ses_bileti(vid):
@@ -114,7 +152,11 @@ def ses_bileti(vid):
 
 
 class Hata(Exception):
-    """Kullanıcıya gösterilecek, açıklaması belli hata (cevir.py bunu hata.txt'ye, tepsi bildirime yazar)."""
+    """Kullanıcıya gösterilecek, açıklaması belli hata (cevir.py bunu hata.txt'ye, tepsi bildirime yazar).
+    yeniden_cevir: kurtarma yolu baştan çevirmek (eklentinin düğmesi POST /hazirla/<id>?cevir=yeniden gönderir)."""
+    def __init__(self, mesaj, yeniden_cevir=False):
+        super().__init__(mesaj)
+        self.yeniden_cevir = yeniden_cevir
 
 
 def _json(url, govde=None, sure=5):
@@ -182,20 +224,39 @@ def deneme_cevirisi(adres, model):
 
 
 def model_kaydet(model):
-    """ayarlar.toml'da [ceviri] model satırını değiştirir; dosyanın geri kalanı ve yorumlar olduğu gibi kalır.
-    Dosya yoksa örnekten kopyalanır. Yazım atomik (yarım dosya kalmaz)."""
+    """ayarlar.toml'da [ceviri] model satırının yalnız değerini değiştirir; dosyanın geri kalanı, satırın girintisi ve
+    yorumu olduğu gibi kalır. Çift/tek tırnaklı değer, girintili satır, bölümsüz dosya desteklenir. Dosya yoksa örnekten
+    kopyalanır. Sonuç yazmadan önce TOML olarak doğrulanır; yazım atomik (yarım dosya kalmaz)."""
     f = KOK / "ayarlar.toml"
     metin = f.read_text("utf-8") if f.exists() else (KOK / "ayarlar.ornek.toml").read_text("utf-8")
-    satir = f"model = {json.dumps(model)}"
-    b = re.search(r"(?ms)^\[ceviri\][^\n]*\n(.*?)(?=^\[|\Z)", metin)
-    if not b:
-        metin = metin.rstrip("\n") + f"\n\n[ceviri]\n{satir}\n"
-    elif re.search(r"(?m)^model\s*=", b.group(1)):
-        bolum = re.sub(r'(?m)^model\s*=\s*"[^"\n]*"', lambda _: satir, b.group(1), count=1)
-        metin = metin[:b.start(1)] + bolum + metin[b.end(1):]
+    deger = json.dumps(model, ensure_ascii=False)  # JSON dizgisi geçerli bir TOML temel dizgisidir
+    satirlar = metin.splitlines(keepends=True)
+    bas, son = None, len(satirlar)  # [ceviri] başlığının satırı, bölümün bittiği satır
+    for i, s in enumerate(satirlar):
+        if re.match(r"\s*\[", s):
+            if bas is not None:
+                son = i
+                break
+            if re.match(r"\s*\[\s*ceviri\s*\]\s*(#.*)?$", s):
+                bas = i
+    if bas is None:
+        metin = metin.rstrip("\n") + f"\n\n[ceviri]\nmodel = {deger}\n"
     else:
-        metin = metin[:b.start(1)] + satir + "\n" + metin[b.start(1):]
-    if tomllib.loads(metin).get("ceviri", {}).get("model") != model:
+        anahtar = re.compile(r"""(\s*(?:model|"model"|'model')\s*=\s*)("(?:[^"\\\n]|\\.)*"|'[^'\n]*')""")
+        for i in range(bas + 1, son):
+            if m := anahtar.match(satirlar[i]):
+                satirlar[i] = m[1] + deger + satirlar[i][m.end():]
+                break
+        else:
+            if not satirlar[bas].endswith("\n"):
+                satirlar[bas] += "\n"
+            satirlar.insert(bas + 1, f"model = {deger}\n")
+        metin = "".join(satirlar)
+    try:
+        tamam = tomllib.loads(metin).get("ceviri", {}).get("model") == model
+    except tomllib.TOMLDecodeError:
+        tamam = False
+    if not tamam:
         raise Hata("ayar dosyası güncellenemedi (beklenmeyen biçim)")
     gecici = f.with_suffix(".tmp")
     gecici.write_text(metin, "utf-8")

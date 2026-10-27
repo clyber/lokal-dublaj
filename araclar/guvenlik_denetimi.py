@@ -28,6 +28,12 @@ assert istek(f"/durum/{hazir}", baslik={**dogru, "Host": "kotu.example:8799"})[0
 assert istek("/hazirla/aaaaaaaaaaa", "POST")[0] == 401, "belirteçsiz iş başlatılabildi"
 assert istek("/kapat", "POST", {"X-TR-Ses": "1"})[0] == 401, "eski sabit başlıkla sunucu kapatılabildi"
 print("tamam: belirteçsiz / yanlış belirteçli / yabancı Host'lu / eski başlıklı istekler reddedildi")
+try:  # R6-04: ASCII dışı bilet/belirteç bağlantıyı koparmamalı
+    assert istek("/ses/aaaaaaaaaaa.m4a?b=%C3%A9")[0] == 401, "ASCII dışı bilet 401 almadı"
+    assert istek("/durum/aaaaaaaaaaa", baslik={"X-TR-Belirtec": "é".encode()})[0] == 401, "ASCII dışı belirteç 401 almadı"
+except http.client.HTTPException as e:
+    raise AssertionError(f"ASCII dışı girdi bağlantıyı kopardı ({type(e).__name__}): sunucu eski olabilir, simgeden Çıkış yapıp yeniden aç")
+print("tamam: ASCII dışı bilet/belirteç 401")
 
 s, g = istek(f"/durum/{hazir}", baslik=dogru)
 assert s == 200, s
@@ -38,6 +44,11 @@ if d.get("durum") == "hazir":
     assert istek(f"/ses/{hazir}.m4a?b={B}")[0] == 401, "ana belirteç bilet yerine geçti"
     assert istek(f"/ses/{hazir}.m4a?b={d['bilet']}", baslik={"Range": "bytes=0-99"})[0] == 206, "doğru biletle ses okunamadı"
     baska = next((x.name for x in is_kok.iterdir() if x.is_dir() and x.name != hazir and any(x.glob("bitti-*"))), None)
+    print("tamam: ses yalnız biletle açılıyor, ana belirteç bilet yerine geçmiyor")
     if baska:
         assert istek(f"/ses/{baska}.m4a?b={d['bilet']}")[0] == 401, "bir videonun bileti başka videoyu açtı"
-    print("tamam: ses yalnız o videoya özel biletle açılıyor")
+        print("tamam: bir videonun bileti başka videoyu açmıyor")
+    else:
+        print("atlandı: videolar arası bilet kontrolü (ikinci hazır video yok)")
+else:  # atlanan kontrol başarı değildir; kur.ps1 -Dogrula bunları ayrıca listeler
+    print("atlandı: ses ve bilet kontrolleri (hazır Türkçe ses yok — bir video hazırlayıp yeniden çalıştır)")
