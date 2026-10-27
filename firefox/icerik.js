@@ -185,10 +185,19 @@
     if (panel) { panel.remove(); panel = null; return; }
     panel = document.createElement("div");
     panel.style.cssText = "position:absolute;top:44px;right:10px;z-index:100;width:340px;padding:10px 12px;border-radius:8px;background:rgba(20,20,20,.94);color:#fff;font:13px Arial;line-height:1.35";
+    panel.className = "lokal-dublaj";
     panel.addEventListener("click", (e) => e.stopPropagation());
     document.querySelector("#movie_player").appendChild(panel);
     panelCiz();
     yenile();
+  }
+
+  // Eklenti güncellenince Firefox yeni betiği açık sekmelere de yükler; eski sürümün düğmeleri sayfada kalıp
+  // yenilerin altında görünür [Fatih 10-27, 0.1.9 güncellemesinde "TR dinle" ile "TR kapat" üst üste].
+  // 0.1.10 öncesi düğmelerde sınıf yok: oynatıcıdaki "TR…" / "▾" düğmeleri ve bilgi paneli de silinir.
+  function eskileriSil() {
+    for (const e of document.querySelectorAll("#movie_player > .lokal-dublaj, #movie_player > button, #movie_player > div"))
+      if (e.classList.contains("lokal-dublaj") || /^(TR|Zaten TR|▾)/.test(e.textContent) || e.style.width === "340px") e.remove();
   }
 
   function kur() {
@@ -202,6 +211,7 @@
     if (!vid || !location.pathname.startsWith("/watch")) return;
     const oyuncu = document.querySelector("#movie_player");
     if (!oyuncu) return setTimeout(kur, 1000);
+    eskileriSil();
     dugme = document.createElement("button");
     dugme.style.cssText = STIL + ";top:10px;right:44px;border-radius:6px 0 0 6px";
     dugme.addEventListener("click", (e) => { e.stopPropagation(); anaEylem(); });
@@ -211,6 +221,7 @@
     bilgiDugme.title = "Bu video için ayrıntı";
     bilgiDugme.addEventListener("click", (e) => { e.stopPropagation(); paneliAcKapa(); });
     [dugme, bilgiDugme].forEach(belirgin);
+    dugme.className = bilgiDugme.className = "lokal-dublaj";
     oyuncu.append(dugme, bilgiDugme);
     dugmeYaz();
     yenile();
