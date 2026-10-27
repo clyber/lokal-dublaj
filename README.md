@@ -61,7 +61,7 @@ git pull
 
 ## Kullanım
 
-1. LM Studio'yu aç, modeli yükle.
+1. LM Studio'yu aç, yerel sunucusunu başlat. İlk kullanımda saatin yanındaki Lokal Dublaj simgesine sağ tıkla → **Çeviri modeli** → listeden bir model seç: üç kısa cümlelik deneme çevirisi yapılır, geçerse seçilir (sonuç bildirimle görünür). Birden çok model varken seçim yapılmazsa hazırlama başlamaz; hangi modelin kullanıldığı ▾ panelinde yazar. Yarıda kalan bir video, model değişse de başladığı modelle tamamlanır.
 2. YouTube'da bir video aç; sağ üstte **TR aç** görünür. Basınca saatin yanında Lokal Dublaj simgesi belirir ve sunucu açılır.
 3. **TR hazırla** → ilerleme düğmede ve ▾ panelinde yüzde olarak görünür.
 4. Hazır olunca **TR dinle**. Kapatmak için aynı düğme; sunucuyu kapatmak için simgeye sağ tıkla → Çıkış. O sırada hazırlanan bir video varsa arka planda bitmeye devam eder.

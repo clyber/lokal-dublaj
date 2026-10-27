@@ -4,11 +4,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.argv = ["cevir.py", "x"]
+import tempfile
 import cevir, ortak
 
 cevir.A["ceviri"]["adres"] = "http://127.0.0.1:9/v1"  # kimsenin dinlemediği port
 try:
-    cevir.ceviri_modeli()
+    cevir.ceviri_modeli(Path(tempfile.mkdtemp()))
     raise AssertionError("kapalı sunucu fark edilmedi")
 except cevir.Hata as e:
     assert "Çeviri sunucusu kapalı" in str(e), e

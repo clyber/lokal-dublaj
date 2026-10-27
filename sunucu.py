@@ -118,6 +118,9 @@ def bilgi(vid, sure_sn):
     b["katsayi"] = round(k, 2)
     if sure_sn:
         b["tahmin_dk"] = round(2 + sure_sn / 60 * k)  # +2 dk: modellerin yüklenmesi, kısa videoda belirgin
+    k = IS / vid / "uretim.json"  # bu videonun hangi modelle çevrildiği (cevir.py yazar; eski işlerde yok)
+    b["model"] = json.loads(k.read_text("utf-8"))["model"] if k.exists() else None
+    b["yeni_model"] = ortak.ayar()["ceviri"]["model"]  # tepsiden değişebilir, her soruda dosyadan okunur
     c = calisan()
     if c and c["vid"] != vid:
         b["gpu_mesgul"] = {"ad": c.get("ad", c["vid"]), "ilerleme": durum(c["vid"]).get("ilerleme", "")}

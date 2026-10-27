@@ -7,7 +7,7 @@ Kullanım: python cevir.py <youtube-bağlantısı> [--ses ema|chatterbox|piper] 
 Ara sonuçlar <calisma_klasoru>/<video-id>/ altında; her adımın dosyası varsa atlanır (yeniden koşmak ucuz).
 Hata olursa <video-id>/hata.txt yazılır; eklenti bunu gösterir, yeniden basınca silinip baştan denenir.
 """
-import argparse, json, re, subprocess, sys, time, urllib.error, urllib.request, wave
+import argparse, json, re, subprocess, sys, time, wave
 from pathlib import Path
 
 import ortak
@@ -18,8 +18,7 @@ ortak.cuda_dll_yolu()
 ORNEK_PIPER = 22050  # Piper orta kalite seslerin örnekleme hızı
 
 
-class Hata(Exception):
-    """Kullanıcıya gösterilecek, açıklaması belli hata (hata.txt'ye bu metin yazılır)."""
+Hata = ortak.Hata  # kullanıcıya gösterilecek, açıklaması belli hata (hata.txt'ye bu metin yazılır)
 
 
 def kos(*a):
@@ -83,31 +82,30 @@ def yaziya_dok(a, d):
     return p
 
 
-def ceviri_modeli():
-    """Çeviri sunucusu açık mı bak; ayarda model yoksa sunucudaki ilk sohbet modelini seç."""
-    adres = A["ceviri"]["adres"].rstrip("/")
-    try:
-        with urllib.request.urlopen(adres + "/models", timeout=5) as y:
-            modeller = [m["id"] for m in json.loads(y.read())["data"]]
-    except Exception:
-        raise Hata(f"Çeviri sunucusu kapalı ({adres}). LM Studio'yu açıp Developer → Start Server de (ya da Ollama'yı başlat).")
-    if A["ceviri"]["model"]:
-        return A["ceviri"]["model"]
-    sohbet = [m for m in modeller if "embed" not in m]
-    if not sohbet:
-        raise Hata("Çeviri sunucusunda yüklü model yok. LM Studio'da bir model indir (öneri: gemma-4-12b-it).")
-    return sohbet[0]
-
-
-def ceviri_sor(model, mesaj):
-    govde = {"model": model, "temperature": 0.2, "messages": [{"role": "user", "content": mesaj}]}
-    r = urllib.request.Request(A["ceviri"]["adres"].rstrip("/") + "/chat/completions", json.dumps(govde).encode(),
-                               {"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(r, timeout=600) as y:
-            return json.loads(y.read())["choices"][0]["message"]["content"]
-    except urllib.error.HTTPError as e:  # sunucunun söylediği sebebi kaybetme (ör. bağlam penceresi aşıldı)
-        raise Hata(f"Çeviri sunucusu isteği reddetti ({e.code}): {e.read().decode('utf-8', 'replace')[:300]}") from e
+def ceviri_modeli(d):
+    """Bu videonun çeviri modeli. Yarıda kalmış iş başladığı modelle sürer (iki modelin çevirisi aynı videoda
+    karışmasın); yeni işte ayardaki model. Seçim yoksa ve tek sohbet modeli varsa o; birden çoksa sessizce ilkini
+    almak yerine kullanıcıdan seçmesi istenir. Seçilen model video klasöründe uretim.json'a yazılır."""
+    adres = A["ceviri"]["adres"]
+    var = [k for k, _ in ortak.model_listesi(adres)]
+    kayit = d / "uretim.json"
+    if kayit.exists() and (d / "ceviri.json").exists():
+        model = json.loads(kayit.read_text("utf-8"))["model"]
+        if model not in var:
+            raise Hata(f"Bu video {model} modeliyle yarıda kalmıştı; o model çeviri sunucusunda yok. LM Studio'da geri yükle.")
+        return model
+    eski = (d / "ceviri.json").exists()  # kaydı olmayan eski sürüm işi: modeli bilinmiyor, kayıt uydurulmaz
+    model = A["ceviri"]["model"]
+    if not model:
+        if len(var) != 1:
+            raise Hata("Çeviri modeli seçilmedi." + (" Saatin yanındaki Lokal Dublaj simgesine sağ tıkla → Çeviri modeli."
+                       if var else " LM Studio'da bir sohbet modeli indir (denenen: gemma-4-12b-it)."))
+        model = var[0]
+    elif model not in var:
+        raise Hata(f"Seçili çeviri modeli ({model}) sunucuda yok. Simgeden başka bir model seç.")
+    if not eski:
+        kayit.write_text(json.dumps({"model": model, "baslangic": time.strftime("%Y-%m-%dT%H:%M:%S%z")}), "utf-8")
+    return model
 
 
 def cevir(p, d, model):
@@ -115,25 +113,15 @@ def cevir(p, d, model):
     tr = json.loads(f.read_text("utf-8")) if f.exists() else {}
     n = A["ceviri"]["grup_boyu"]
     def grup_cevir(grup, onceki):
-        satirlar = "\n".join(f'{x["id"]}\t{x["son"] - x["bas"]:.1f}sn\t{x["metin"]}' for x in grup)
-        istem = (
-            "Aşağıdaki video konuşma parçalarını doğal, akıcı, konuşma dilinde Türkçeye çevir. "
-            "Her parça yanında verilen saniyede SESLİ okunabilecek kadar kısa olsun; anlamı koru, sayı ve birimleri koru, "
-            "teknik terimleri Türkçede yaygın hâliyle yaz. Çıktı: her parça için TEK satır, biçim `id<TAB>çeviri`; "
-            "başka hiçbir şey yazma (açıklama, JSON, kod bloğu yok).\n"
-            f"Önceki bağlam: {onceki}\n\nid\tsüre\tmetin\n{satirlar}"
-        )
         try:
-            cevap = re.sub(r"<think>.*?</think>", "", ceviri_sor(model, istem), flags=re.S)
+            cevap = ortak.ceviri_sor(A["ceviri"]["adres"], model, ortak.ceviri_istemi(grup, onceki))
         except Hata as e:
             # modelin bağlam penceresi dolduysa (LM Studio paralel yuvalarda pencereyi bölüyor) grubu ikiye ayır
             if "Context size" in str(e) and len(grup) > 1:
                 y = len(grup) // 2
                 return {**grup_cevir(grup[:y], onceki), **grup_cevir(grup[y:], "")}
             raise
-        istenen = {str(x["id"]) for x in grup}
-        return {k: v.strip() for k, v in re.findall(r"^\s*(\d+)\s*[\t:|-]\s*(.+?)\s*$", cevap, flags=re.M)
-                if k in istenen and v.strip()}
+        return ortak.cevap_coz(cevap, {str(x["id"]) for x in grup})
 
     for tur in range(3):  # eksik kalan gruplar sonraki turda yeniden istenir
         for i in range(0, len(p), n):
@@ -238,6 +226,7 @@ def bitir(d, kaynak, t, motor, ad):
 
 
 def calis(g, vid, d):
+    model = ceviri_modeli(d)  # indirmeden ve yazıya dökmeden önce: sunucu kapalıysa ya da model yoksa boşa iş yapılmasın
     kaynak, a = indir(g.url, d)
     kilit = ortak.gpu_kilidi(IS, g.oncelik)  # süreç bitene kadar tutulur
     (IS / ".calisan").write_text(json.dumps({"vid": vid, "ad": g.ad or vid}, ensure_ascii=False), "utf-8")
@@ -248,7 +237,7 @@ def calis(g, vid, d):
             f.unlink(missing_ok=True)
         print("Video zaten hedef dilde, işlem yok.")
         return None
-    tr = cevir(p, d, ceviri_modeli())
+    tr = cevir(p, d, model)
     t = seslendir(p, tr, d, g.ses)
     return bitir(d, kaynak, t, g.ses, g.ad or vid)
 

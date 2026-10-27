@@ -1,5 +1,5 @@
 """Lokal Dublaj başlatıcısı: saatin yanındaki simge (tepsi). Açınca sunucuyu başlatır, durumunu gösterir, durdurur;
-"Windows açılınca başlat" tercihi.
+çeviri modelini seçtirir (deneme çevirisiyle); "Windows açılınca başlat" tercihi.
 Çalıştır: .venv\\Scripts\\pythonw baslatici.py
 """
 import json, os, subprocess, sys, threading, time, urllib.request, winreg
@@ -84,15 +84,52 @@ def tepsi():
         d.text((14, 18), "TR", fill="white", font_size=30)
         return im
 
-    son = {"metin": "", "acik": None}
+    son = {"metin": "", "acik": None, "modeller": None, "secili": "", "deneniyor": None}
 
     def metin(_):
         return son["metin"]
+
+    def modelleri_yenile():
+        a = ortak.ayar()
+        try:
+            son["modeller"] = ortak.model_listesi(a["ceviri"]["adres"])
+        except ortak.Hata:
+            son["modeller"] = None  # çeviri sunucusu kapalı
+        son["secili"] = a["ceviri"]["model"]
+        ikon.update_menu()
+
+    def model_sec(kimlik):
+        """Önce 3 cümlelik deneme çevirisi; ancak geçerse ayara yazılır. Sonuç bildirimle (çeviriler görünsün)."""
+        son["deneniyor"] = kimlik
+        ikon.update_menu()
+        ikon.notify(f"{kimlik} deneniyor; model belleğe yükleniyorsa 1 dakikayı bulabilir.", "Lokal Dublaj · çeviri modeli")
+        try:
+            tr = ortak.deneme_cevirisi(ortak.ayar()["ceviri"]["adres"], kimlik)
+            ortak.model_kaydet(kimlik)
+            ikon.notify(f"Seçildi: {kimlik}. Yeni videolar bununla çevrilir.\n" + "\n".join(tr.values()), "Lokal Dublaj · çeviri modeli")
+        except Exception as e:
+            ikon.notify(f"{kimlik} seçilmedi: {e}", "Lokal Dublaj · çeviri modeli")
+        son["deneniyor"] = None
+        modelleri_yenile()
+
+    def model_ogeleri():
+        if son["modeller"] is None:
+            yield pystray.MenuItem("Çeviri sunucusu kapalı (LM Studio'yu aç)", None, enabled=False)
+        elif not son["modeller"]:
+            yield pystray.MenuItem("Sunucuda sohbet modeli yok", None, enabled=False)
+        for k, bellekte in son["modeller"] or []:
+            ek = " · deneniyor…" if son["deneniyor"] == k else " · bellekte" if bellekte else ""
+            yield pystray.MenuItem(k + ek, (lambda k: lambda: threading.Thread(target=model_sec, args=(k,)).start())(k),
+                                   checked=(lambda k: lambda _: son["secili"] == k)(k), radio=True,
+                                   enabled=not son["deneniyor"])
+        yield pystray.Menu.SEPARATOR
+        yield pystray.MenuItem("Listeyi yenile", lambda: threading.Thread(target=modelleri_yenile).start())
 
     menu = pystray.Menu(
         pystray.MenuItem(metin, None, enabled=False),
         pystray.MenuItem(lambda _: "Durdur" if son["acik"] else "Başlat",
                          lambda: threading.Thread(target=durdur if son["acik"] else baslat).start(), default=True),
+        pystray.MenuItem(lambda _: f"Çeviri modeli: {son['secili'] or 'seçilmedi'}", pystray.Menu(model_ogeleri)),
         pystray.MenuItem("Windows açılınca başlat", lambda: acilista_ayarla(not acilista()), checked=lambda _: acilista()),
         pystray.MenuItem("Çıkış (sunucuyu da kapatır)", lambda i: (durdur(), i.stop())),
     )
@@ -100,7 +137,11 @@ def tepsi():
 
     def izle():
         baslat()
+        tur = 0
         while True:
+            if tur % 10 == 0 and not son["deneniyor"]:  # model listesi ~30 sn'de bir (LM Studio sonradan açılabilir)
+                modelleri_yenile()
+            tur += 1
             acik, m = durum()
             if (acik, m) != (son["acik"], son["metin"]):
                 son.update(acik=acik, metin=m)

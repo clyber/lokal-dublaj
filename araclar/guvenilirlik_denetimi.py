@@ -12,7 +12,7 @@ gecici = Path(tempfile.mkdtemp())
 try:
     # K01: çevirinin bir kısmı hiç gelmezse iş "hazır" sayılmamalı (eskiden yarıdan azı eksikse geçiyordu)
     p = [{"id": i, "bas": i, "son": i + 1, "metin": f"cumle {i}"} for i in range(10)]
-    cevir.ceviri_sor = lambda model, istem: "\n".join(f"{i}\tçeviri {i}" for i in range(6))  # 4 parça hep eksik
+    ortak.ceviri_sor = lambda adres, model, istem: "\n".join(f"{i}\tçeviri {i}" for i in range(6))  # 4 parça hep eksik
     d1 = gecici / "k01"; d1.mkdir()
     try:
         cevir.cevir(p, d1, "model")
@@ -22,12 +22,12 @@ try:
         print("tamam K01: eksik çeviri hata veriyor ->", e)
 
     # Bağlam penceresi dolunca grup ikiye bölünerek yine tamamlanmalı (10-26'da gerçek videoda yakalandı)
-    def dar_pencere(model, istem):
+    def dar_pencere(adres, model, istem):
         ids = [int(s.split("\t")[0]) for s in istem.split("id\tsüre\tmetin\n")[1].splitlines()]
         if len(ids) > 3:
             raise cevir.Hata('Çeviri sunucusu isteği reddetti (400): {"message":"Context size has been exceeded."}')
         return "\n".join(f"{i}\tçeviri {i}" for i in ids)
-    cevir.ceviri_sor = dar_pencere
+    ortak.ceviri_sor = dar_pencere
     d1b = gecici / "k01b"; d1b.mkdir()
     sonuc = cevir.cevir(p, d1b, "model")
     assert len(sonuc) == 10, f"bölme sonrası eksik: {len(sonuc)}"

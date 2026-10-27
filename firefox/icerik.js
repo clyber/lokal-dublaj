@@ -160,6 +160,10 @@
       d.durum === "hata" ? `Hata: ${d.ilerleme} — üstteki düğmeyle yeniden dene` :
       d.durum === "sunucu-yok" ? "Sunucu kapalı — üstteki düğmeye basınca açılır" :
       d.ilerleme || "Hazırlanıyor"));
+    if (!["turkce", "sunucu-yok"].includes(d.durum) && d.durum)
+      panel.append(satir("Çeviri modeli",
+        d.durum === "hazir" ? (d.model ? `${d.model} ile çevrildi` : "kayıt yok (önceki sürüm)") :
+        d.model || d.yeni_model || "seçilmedi — saatin yanındaki simgeden seç"));
     if (d.gpu_mesgul && d.durum !== "hazir")
       panel.append(satir("Ekran kartında şimdi", `${d.gpu_mesgul.ad} · ${d.gpu_mesgul.ilerleme || ""}`));
     // Panel yalnız bilgi verir; iş yapan tek düğme üstteki ana düğme
