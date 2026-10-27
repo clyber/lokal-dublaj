@@ -1,4 +1,4 @@
-// YouTube Türkçe Ses — içerik betiği.
+// Lokal Dublaj — içerik betiği.
 // Her videoda oynatıcının sağ üstüne bir düğme koyar; basınca o videonun bilgi paneli açılır
 // (durum ya da ilerleme çubuğu, ekran kartında ne var) ve oradan hazırlatılır / dinlenir.
 // Türkçe ses arka planda (arka.js) çalar, videonun saatini takip eder: oynat/durdur/sar/hız YouTube'un düğmeleriyle.
@@ -15,7 +15,7 @@
   const sor = (yol, yontem) => browser.runtime.sendMessage({ tip: "sor", yol, yontem });
   const baslik = () => (document.title || vid).replace(/^\(\d+\)\s*/, "").replace(/ - YouTube$/, "");
   // Sunucunun "· 3/4 çeviri %40" yazısından toplam yüzde: her aşama çeyrek sayılır.
-  // ponytail: aşamalar eşit ağırlıklı varsayılır (çeviri/seslendirme uzun sürer), gerçek süreye göre ağırlık gerekirse sunucu yüzde göndersin.
+  // Sınır: aşamalar eşit ağırlıklı varsayılır (çeviri/seslendirme uzun sürer), gerçek süreye göre ağırlık gerekirse sunucu yüzde göndersin.
   function toplamYuzde(ilerleme) {
     const a = (ilerleme || "").match(/(\d)\/4[^%]*(?:%(\d+))?/);
     if (a) return Math.min(99, Math.round(((a[1] - 1) + (a[2] || 0) / 100) * 25));

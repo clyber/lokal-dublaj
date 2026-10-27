@@ -193,4 +193,8 @@ if __name__ == "__main__":
     port = A["sunucu"]["port"]
     print(f"Lokal Dublaj sunucusu: http://127.0.0.1:{port}  (iş klasörü {IS})", flush=True)
     ThreadingHTTPServer.allow_reuse_address = False  # Windows'ta port doluyken sessizce ikinci kez bağlanmasın
-    ThreadingHTTPServer(("127.0.0.1", port), Isleyici).serve_forever()
+    try:
+        sunucu = ThreadingHTTPServer(("127.0.0.1", port), Isleyici)
+    except OSError as e:
+        sys.exit(f"Port {port} kullanımda ya da açılamadı ({e}). Başka bir program ya da açık bir Lokal Dublaj olabilir.")
+    sunucu.serve_forever()

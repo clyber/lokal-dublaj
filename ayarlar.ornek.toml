@@ -1,7 +1,7 @@
 # Lokal Dublaj ayarları. Bu dosyayı "ayarlar.toml" adıyla kopyalayıp değiştir.
 # Yazılmayan her alan varsayılanını alır (ortak.py → VARSAYILAN).
 
-hedef_dil = "tr"            # şimdilik yalnız Türkçe denendi
+hedef_dil = "tr"            # bu sürümde yalnız Türkçe (çeviri istemi ve EMA sesi Türkçe)
 cikti_klasoru = ""          # mp4 üretimi açıksa bitmiş videolar buraya taşınır (ör. "D:/Videolar/Dublaj")
 calisma_klasoru = ""        # boş: uygulama klasörü/is (ara dosyalar, Türkçe ses dosyaları)
 model_klasoru = ""          # boş: Hugging Face'in kendi önbelleği; ör. "E:/Modeller/HF"
@@ -9,11 +9,11 @@ js_ortami = "node"          # yt-dlp için: node ya da deno (biri kurulu olmalı
 
 [ceviri]
 adres = "http://localhost:1234/v1"   # LM Studio (varsayılan) ya da Ollama: http://localhost:11434/v1
-model = ""                           # boş: sunucudaki ilk model; ör. "gemma-4-12b-it"
+model = ""                           # öneri: yaz (ör. "gemma-4-12b-it"); boşsa sunucu listesindeki ilk model seçilir
 grup_boyu = 20                       # bir istekte çevrilen cümle sayısı
 
 [ses]
-motor = "ema"               # ema (hızlı, tek Türkçe ses) · chatterbox (konuşmacıya benzer, yavaş) · piper
+motor = "ema"               # desteklenen: ema. Deneysel: chatterbox (pip install chatterbox-tts) · piper (pip install piper-tts)
 piper_sesi = ""             # piper seçilirse .onnx ses dosyasının yolu
 ozgun_seviye = 0.15         # mp4'te özgün sesin seviyesi (0–1)
 azami_hizlandirma = 1.35    # Türkçe cümle sığmazsa en çok bu kadar hızlandırılır
@@ -26,4 +26,4 @@ azami_yukseklik = 720
 model = "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
 
 [sunucu]
-port = 8799                 # değiştirirsen eklentideki adresi de değiştir
+port = 8799                 # değiştirme: imzalı eklenti bu sürümde 8799'a bağlı

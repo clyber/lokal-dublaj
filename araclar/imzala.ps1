@@ -10,6 +10,7 @@ $s = @(Get-Content $Anahtar | Where-Object { $_.Trim() } | ForEach-Object { ($_ 
 if ($s.Count -lt 2) { throw "Anahtar dosyasında iki satır yok: $Anahtar" }
 $env:WEB_EXT_API_KEY = $s[0]
 $env:WEB_EXT_API_SECRET = $s[1]
+Copy-Item "$kok\LICENSE" "$kok\firefox\LICENSE" -Force  # MIT bildirimi dağıtılan pakette de olsun (firefox/LICENSE git dışı)
 npx --yes web-ext@8 sign --channel unlisted --source-dir "$kok\firefox" --artifacts-dir "$kok\imzali"
 if ($LASTEXITCODE) { throw "İmza başarısız" }
 $v = (Get-Content "$kok\firefox\manifest.json" -Raw | ConvertFrom-Json).version

@@ -54,7 +54,7 @@ def indir(url, d):
         r = subprocess.run([sys.executable, "-m", "yt_dlp", "--no-playlist", "--js-runtimes", A["js_ortami"],
                             "-f", bicim, *ek, "-o", str(hedef), url])
         if r.returncode or not hedef.exists():
-            raise Hata("Video indirilemedi (yt-dlp). İnternet bağlantısını kontrol et; sürerse yt-dlp'yi güncelle: pip install -U yt-dlp")
+            raise Hata("Video indirilemedi (yt-dlp). İnternet bağlantısını kontrol et; sürerse yt-dlp'yi güncelle: .venv\\Scripts\\pip install -U \"yt-dlp[default]\"")
     a = d / "ses16k.wav"
     if not a.exists():
         kos("ffmpeg", "-y", "-loglevel", "error", "-i", str(hedef), "-ac", "1", "-ar", "16000", str(a))
