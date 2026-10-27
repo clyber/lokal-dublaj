@@ -138,7 +138,7 @@ def belirtec():
             return b
         time.sleep(0.02)
     # 1 sn sonra hâlâ boş: üreten süreç yazamadan ölmüş. Yeniden üret, atomik yerleştir, dosyada kalanı döndür.
-    # ponytail: tam bu anda iki süreç birden yeniden üretirse biri eski değeri tutabilir; sunucuyu yeniden açmak düzeltir.
+    # Sınır: tam bu anda iki süreç birden yeniden üretirse biri eski değeri tutabilir; sunucuyu yeniden açmak düzeltir.
     gecici = f.with_name(f".belirtec.{os.getpid()}.tmp")
     gecici.write_text(secrets.token_urlsafe(32))
     gecici.replace(f)
