@@ -1,0 +1,22 @@
+{
+  "manifest_version": 2,
+  "name": "Lokal Dublaj",
+  "version": "0.1.8",
+  "description": "YouTube videosunu yerel bilgisayarda hazırlanan Türkçe sesle, videonun kendi düğmeleriyle senkron oynatır.",
+  "permissions": ["*://*.youtube.com/*", "http://127.0.0.1/*", "nativeMessaging"],
+  "background": { "scripts": ["arka.js"] },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["icerik.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "youtube-turkce-ses@hexa.local",
+      "update_url": "https://raw.githubusercontent.com/clyber/lokal-dublaj/main/guncelleme.json",
+      "data_collection_permissions": { "required": ["none"] }
+    }
+  }
+}

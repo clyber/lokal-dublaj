@@ -1,0 +1,10 @@
+.venv/
+is/
+is-log.txt
+__pycache__/
+ayarlar.toml
+imzali/
+.baslatici-kilit
+kopru/lokal_dublaj.json
+.amo-upload-uuid
+*.bak

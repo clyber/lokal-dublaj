@@ -1,0 +1,9 @@
+# Denenen sürümler (Windows 10, Python 3.13, RTX 5080). PyTorch'u önce CUDA'lı kur, README'ye bak.
+yt-dlp>=2026.10.21
+faster-whisper==1.2.1
+ema-lightning==1.1.2
+librosa==0.11.0
+soundfile==0.14.0
+numpy>=2.0
+pystray==0.19.5
+pillow>=12.0

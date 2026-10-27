@@ -1,0 +1,12 @@
+{
+  "addons": {
+    "youtube-turkce-ses@hexa.local": {
+      "updates": [
+        {
+          "version": "0.1.8",
+          "update_link": "https://github.com/clyber/lokal-dublaj/releases/download/v0.1.8/lokal-dublaj-0.1.8.xpi"
+        }
+      ]
+    }
+  }
+}
