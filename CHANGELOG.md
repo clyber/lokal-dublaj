@@ -2,6 +2,9 @@
 
 Sürüm numarası Firefox eklentisinin sürümüdür; sunucu tarafı aynı commit'te güncellenir. Eklenti kendiliğinden güncellenir, sunucu tarafı için `git pull` ve `pwsh -File kur.ps1 -Uygula`.
 
+## 0.1.14 — 2026-10-30
+- Lisans sahibi adı "FTH" olarak güncellendi; işlevde değişiklik yok. Eklenti kendiliğinden güncellenir, sunucu tarafında bir şey yapmana gerek yok.
+
 ## 0.1.13 — 2026-10-27
 - **Model kökeni:** `uretim.json` çeviri sunucusu adresini de kaydeder; yarım çeviri yalnız aynı adres + modelle sürer. Modeli bilinmeyen (eski sürümden) ya da adresi/modeli uyuşmayan yarım çeviri sessizce yeni modelle tamamlanmaz: düğme "TR baştan çevir" olur, basınca yazıya döküm korunarak seçili modelle baştan çevrilir (`cevir.py --yeniden-cevir`). Hazır sese dokunulmaz.
 - `uretim.json` ve `parcalar.json` atomik yazılır; sunucu yarım/bozuk kaydı okurken çökmez.
