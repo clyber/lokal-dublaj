@@ -2,6 +2,9 @@
 
 Sürüm numarası Firefox eklentisinin sürümüdür; sunucu tarafı aynı commit'te güncellenir. Eklenti kendiliğinden güncellenir, sunucu tarafı için `git pull` ve `pwsh -File kur.ps1 -Uygula`.
 
+## Yayınlanmamış
+- **Deneysel ses motoru `pocket`** (Pocket TTS TR 24L, 8 sn örnek sese göre konuşur): `--ses pocket`, ayarlar.toml `ses.pocket_ornek`, isteğe bağlı `pocket_yapilandirma` ve `trnorm_yolu`; `pip install pocket-tts`. Varsayılan hâlâ `ema`.
+
 ## 0.1.14 — 2026-10-30
 - Lisans sahibi adı "FTH" olarak güncellendi; işlevde değişiklik yok. Eklenti kendiliğinden güncellenir, sunucu tarafında bir şey yapmana gerek yok.
 
