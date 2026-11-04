@@ -3,7 +3,7 @@
 Akış: yt-dlp (ses; istenirse video) -> faster-whisper (yazıya dök) -> LM Studio/Ollama (çevir)
 -> EMA Lightning / Chatterbox / Piper (Türkçe ses) -> zaman çizelgesine yerleştir -> turkce-<motor>.m4a
 (video.mp4_uret açıksa özgün ses kısık + Türkçe ses -> mp4). Ayarlar: ayarlar.toml (bkz. ayarlar.ornek.toml).
-Kullanım: python cevir.py <youtube-bağlantısı> [--ses ema|chatterbox|piper] [--ad "dosya adı"] [--oncelik]
+Kullanım: python cevir.py <youtube-bağlantısı> [--ses ema|pocket|chatterbox|piper] [--ad "dosya adı"] [--oncelik]
 Ara sonuçlar <calisma_klasoru>/<video-id>/ altında; her adımın dosyası varsa atlanır (yeniden koşmak ucuz).
 Hata olursa <video-id>/hata.txt yazılır; eklenti bunu gösterir, yeniden basınca silinip baştan denenir.
 """
@@ -172,6 +172,18 @@ def cevir(p, d, model):
     return tr
 
 
+def pocket_parcala(m, sinir=190):
+    """Pocket TTS uzun metinde cümle sonunu yutabilir: cümleler ~190 karakterlik gruplara bölünür, her grup ayrı üretilir."""
+    grup, cur = [], ""
+    for c in re.split(r"(?<=[.!?])\s+", m.strip()):
+        if cur and len(cur) + 1 + len(c) > sinir:
+            grup.append(cur)
+            cur = c
+        else:
+            cur = (cur + " " + c).strip()
+    return grup + [cur] if cur else grup
+
+
 def seslendir(p, tr, d, motor):
     import numpy as np, soundfile as sf, librosa
     sd = d / f"tts-{motor}"
@@ -187,6 +199,30 @@ def seslendir(p, tr, d, motor):
             for x, s in zip(grup, tts.say([tr[str(x["id"])].strip() for x in grup])):
                 sf.write(sd / f'{x["id"]}.wav', s.audio, s.sample_rate)
             print(f"ses {min(i + 32, len(eksik))}/{len(eksik)}", flush=True)
+    elif motor == "pocket":  # Pocket TTS TR 24L: 8 sn örnek sese göre konuşur (Hermes'in sesiyle aynı: ov_t87, sentetik); pip install pocket-tts
+        import copy, torch
+        from pocket_tts import TTSModel
+        ornek = Path(A["ses"]["pocket_ornek"] or "")
+        if not ornek.is_file():
+            raise Hata("Pocket seçili ama ayarlar.toml'da ses.pocket_ornek (8 sn örnek ses, .wav) yok ya da dosya bulunamadı.")
+        if A["ses"]["trnorm_yolu"]:
+            sys.path.insert(0, A["ses"]["trnorm_yolu"])
+        try:
+            from trnorm import normalize as sayi_yaz  # rakamları okunuşa çevirir; Pocket rakamı kötü okur
+        except ImportError:
+            sayi_yaz = lambda m: m
+        pt = TTSModel.load_model(**({"config": A["ses"]["pocket_yapilandirma"]} if A["ses"]["pocket_yapilandirma"] else {})).to("cuda")
+        durum = pt.get_state_for_audio_prompt(str(ornek))
+        sr = pt.sample_rate
+
+        def uret(m, w):
+            parca = []
+            for j, g in enumerate(pocket_parcala(sayi_yaz(m))):
+                torch.manual_seed(1234)  # Hermes sunucusu ve kör testlerle aynı tohum
+                if j:
+                    parca.append(np.zeros(int(sr * 0.2), np.float32))
+                parca.append(pt.generate_audio(copy.deepcopy(durum), g).float().cpu().numpy().squeeze())
+            sf.write(w, np.concatenate(parca), sr)
     elif motor == "chatterbox":  # konuşmacının kendi sesinden 12 sn örnekle ona benzer Türkçe ses
         from chatterbox.mtl_tts import ChatterboxMultilingualTTS
         cb = ChatterboxMultilingualTTS.from_pretrained(device="cuda")
@@ -274,7 +310,7 @@ def calis(g, vid, d):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("url")
-    ap.add_argument("--ses", choices=["ema", "chatterbox", "piper"], default=A["ses"]["motor"])
+    ap.add_argument("--ses", choices=["ema", "pocket", "chatterbox", "piper"], default=A["ses"]["motor"])
     ap.add_argument("--ad", help="mp4 üretilirse çıktı dosyasının adı (uzantısız)")
     ap.add_argument("--oncelik", action="store_true", help="eklentiden gelen istek: toplu işin önüne geçer")
     ap.add_argument("--yeniden-cevir", action="store_true",
