@@ -13,7 +13,7 @@ model = ""                           # öneri: yaz (ör. "gemma-4-12b-it"); boş
 grup_boyu = 20                       # bir istekte çevrilen cümle sayısı
 
 [ses]
-motor = "ema"               # desteklenen: ema. Deneysel: chatterbox (pip install chatterbox-tts) · piper (pip install piper-tts)
+motor = "ema"               # desteklenen: ema. Deneysel: chatterbox (pip install chatterbox-tts) · piper (pip install piper-tts) · pocket (pip install pocket-tts; ses.pocket_ornek = 8 sn örnek ses .wav, istersen pocket_yapilandirma ve trnorm_yolu)
 piper_sesi = ""             # piper seçilirse .onnx ses dosyasının yolu
 ozgun_seviye = 0.15         # mp4'te özgün sesin seviyesi (0–1)
 azami_hizlandirma = 1.35    # Türkçe cümle sığmazsa en çok bu kadar hızlandırılır
