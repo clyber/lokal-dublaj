@@ -13,7 +13,8 @@ VARSAYILAN = {
     "model_klasoru": "",            # boş: Hugging Face'in kendi önbelleği
     "js_ortami": "node",            # yt-dlp'nin YouTube için istediği JavaScript ortamı: node ya da deno
     "ceviri": {"adres": "http://localhost:1234/v1", "model": "", "grup_boyu": 20},
-    "ses": {"motor": "ema", "piper_sesi": "", "ozgun_seviye": 0.15, "azami_hizlandirma": 1.35},
+    "ses": {"motor": "ema", "piper_sesi": "", "ozgun_seviye": 0.15, "azami_hizlandirma": 1.35,
+            "pocket_ornek": "", "pocket_yapilandirma": "", "trnorm_yolu": ""},
     "video": {"mp4_uret": False, "azami_yukseklik": 720},
     "yaziya_dokme": {"model": "mobiuslabsgmbh/faster-whisper-large-v3-turbo"},
     "sunucu": {"port": 8799},
@@ -273,5 +274,5 @@ if __name__ == "__main__":  # küçük öz denetim: python ortak.py
     except ValueError:
         pass
     a = ayar()
-    assert a["ses"]["motor"] in ("ema", "chatterbox", "piper") and a["sunucu"]["port"] > 0
+    assert a["ses"]["motor"] in ("ema", "pocket", "chatterbox", "piper") and a["sunucu"]["port"] > 0
     print("ortak.py denetimi geçti:", a["ses"]["motor"], a["sunucu"]["port"], a["calisma_klasoru"])
