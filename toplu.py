@@ -1,6 +1,6 @@
 """Bir YouTube oynatma listesinin tamamını sırayla seslendirir (önden hazırlık).
 
-Kullanım: python toplu.py <oynatma-listesi-bağlantısı> [--ses ema|pocket|chatterbox|piper]
+Kullanım: python toplu.py <oynatma-listesi-bağlantısı> [--ses ema|ahenk|pocket|chatterbox|piper]
 Her video ayrı süreçte işlenir (ekran kartı belleği her videodan sonra boşalır); biten video atlanır,
 hata veren bir kez yeniden denenir. Durum: <calisma_klasoru>/toplu-durum.tsv (sıra, id, sonuç, saat, süre, başlık).
 """
