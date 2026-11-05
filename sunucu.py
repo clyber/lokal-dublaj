@@ -21,7 +21,7 @@ IS = A["calisma_klasoru"]
 PORT = A["sunucu"]["port"]
 BELIRTEC = ortak.belirtec()
 SES = A["ses"]["motor"]
-MOTORLAR = ("ema", "pocket", "chatterbox", "piper")
+MOTORLAR = ("ema", "ahenk", "pocket", "chatterbox", "piper")
 AZAMI_IS = 3  # sunucunun aynı anda açık tuttuğu cevir.py (her biri indirir; ekran kartını zaten sırayla kullanırlar) (G02)
 AZAMI_SURE = 86400  # sn; /bilgi?sure= üst sınırı
 surecler = {}  # bu sunucunun başlattığı işler
