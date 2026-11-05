@@ -3,7 +3,7 @@
 Akış: yt-dlp (ses; istenirse video) -> faster-whisper (yazıya dök) -> LM Studio/Ollama (çevir)
 -> EMA Lightning / Chatterbox / Piper (Türkçe ses) -> zaman çizelgesine yerleştir -> turkce-<motor>.m4a
 (video.mp4_uret açıksa özgün ses kısık + Türkçe ses -> mp4). Ayarlar: ayarlar.toml (bkz. ayarlar.ornek.toml).
-Kullanım: python cevir.py <youtube-bağlantısı> [--ses ema|pocket|chatterbox|piper] [--ad "dosya adı"] [--oncelik]
+Kullanım: python cevir.py <youtube-bağlantısı> [--ses ema|ahenk|pocket|chatterbox|piper] [--ad "dosya adı"] [--oncelik]
 Ara sonuçlar <calisma_klasoru>/<video-id>/ altında; her adımın dosyası varsa atlanır (yeniden koşmak ucuz).
 Hata olursa <video-id>/hata.txt yazılır; eklenti bunu gösterir, yeniden basınca silinip baştan denenir.
 """
@@ -223,6 +223,13 @@ def seslendir(p, tr, d, motor):
                     parca.append(np.zeros(int(sr * 0.2), np.float32))
                 parca.append(pt.generate_audio(copy.deepcopy(durum), g).float().cpu().numpy().squeeze())
             sf.write(w, np.concatenate(parca), sr)
+    elif motor == "ahenk":  # Ahenk TTS (VoxCPM2 + Türkçe LoRA, tek kadın sesi): kendi Python ortamında ayrı süreç; parçalar tts-ahenk/ altına yazılır
+        a = A["ses"]
+        if not (a["ahenk_python"] and a["ahenk_depo"]) or not Path(a["ahenk_python"]).is_file():
+            raise Hata("Ahenk seçili ama ayarlar.toml'da ses.ahenk_python (Ahenk ortamının python.exe'si) ve ses.ahenk_depo (Ahenk model klasörü) yok ya da bulunamadı.")
+        kos(a["ahenk_python"], str(Path(__file__).with_name("ahenk_uret.py")), str(d), "--depo", a["ahenk_depo"],
+            *(["--hf", a["ahenk_hf"]] if a["ahenk_hf"] else []), *(["--trnorm", a["trnorm_yolu"]] if a["trnorm_yolu"] else []))
+        sr = sf.info(str(next(sd.glob("*.wav")))).samplerate
     elif motor == "chatterbox":  # konuşmacının kendi sesinden 12 sn örnekle ona benzer Türkçe ses
         from chatterbox.mtl_tts import ChatterboxMultilingualTTS
         cb = ChatterboxMultilingualTTS.from_pretrained(device="cuda")
@@ -310,7 +317,7 @@ def calis(g, vid, d):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("url")
-    ap.add_argument("--ses", choices=["ema", "pocket", "chatterbox", "piper"], default=A["ses"]["motor"])
+    ap.add_argument("--ses", choices=["ema", "ahenk", "pocket", "chatterbox", "piper"], default=A["ses"]["motor"])
     ap.add_argument("--ad", help="mp4 üretilirse çıktı dosyasının adı (uzantısız)")
     ap.add_argument("--oncelik", action="store_true", help="eklentiden gelen istek: toplu işin önüne geçer")
     ap.add_argument("--yeniden-cevir", action="store_true",
